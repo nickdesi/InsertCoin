@@ -138,6 +138,8 @@ export default function App() {
   const [toasts, setToasts] = useState([]);
   const [lightboxSrc, setLightboxSrc] = useState(null);
   const [platformPicker, setPlatformPicker] = useState({ open: false, platforms: [], data: null, wiki: null });
+  const [ebayCid, setEbayCid] = useState(() => localStorage.getItem('ebay_cid') || '');
+  const [ebayCs, setEbayCs] = useState(() => localStorage.getItem('ebay_cs') || '');
   const lastRawgId = useRef(null);
 
   const storageKey = `ludotheque_v2_${user}`;
@@ -683,19 +685,30 @@ export default function App() {
           onRefresh={showDetailFromList}
           onLightbox={setLightboxSrc}
           fetchWikiScreenshots={fetchWikiScreenshots}
+          ebayCid={ebayCid}
+          ebayCs={ebayCs}
         />}
       </Modal>
 
       {/* API Key Modal */}
-      <Modal open={apiOpen} onClose={() => setApiOpen(false)} title="Clé API RAWG">
+      <Modal open={apiOpen} onClose={() => setApiOpen(false)} title="Clés API">
         <p style={{ color: 'var(--text2)', fontSize: 'var(--font-sm)', marginBottom: '1rem' }}>
-          Pour chercher des jaquettes et infos automatiquement. Gratuit sur <a href="https://rawg.io/apidocs" target="_blank" style={{ color: 'var(--primary-light)' }}>rawg.io</a>.
+          Clé RAWG : gratuit sur <a href="https://rawg.io/apidocs" target="_blank" style={{ color: 'var(--primary-light)' }}>rawg.io</a>.
+          Clés eBay : gratuit sur <a href="https://developer.ebay.com/" target="_blank" style={{ color: 'var(--primary-light)' }}>developer.ebay.com</a> (app Production).
         </p>
         <div className="form-group">
-          <span>Ta clé API</span>
-          <input className="form-control" value={apiKey} onChange={e => setApiKey(e.target.value)} placeholder="Colle ta clé ici" style={{ fontFamily: 'monospace' }} />
+          <span>Clé API RAWG</span>
+          <input className="form-control" value={apiKey} onChange={e => setApiKey(e.target.value)} placeholder="Colle ta clé RAWG" style={{ fontFamily: 'monospace' }} />
         </div>
-        <button className="btn btn-primary btn-full" onClick={() => { setApiKey(apiKey); setApiOpen(false); toast('Clé API enregistrée', 'success'); }}>Enregistrer</button>
+        <div className="form-group">
+          <span>eBay Client ID</span>
+          <input className="form-control" value={ebayCid} onChange={e => { setEbayCid(e.target.value); localStorage.setItem('ebay_cid', e.target.value); }} placeholder="Colle ton eBay Client ID" style={{ fontFamily: 'monospace' }} />
+        </div>
+        <div className="form-group">
+          <span>eBay Client Secret</span>
+          <input className="form-control" type="password" value={ebayCs} onChange={e => { setEbayCs(e.target.value); localStorage.setItem('ebay_cs', e.target.value); }} placeholder="Colle ton eBay Client Secret" style={{ fontFamily: 'monospace' }} />
+        </div>
+        <button className="btn btn-primary btn-full" onClick={() => { setApiOpen(false); toast('Clés enregistrées', 'success'); }}>Enregistrer</button>
       </Modal>
 
       {/* Platform Picker */}
@@ -730,7 +743,7 @@ export default function App() {
   );
 }
 
-function DetailView({ game, games, setGames, toast, apiKey, onEdit, onDelete, onRefresh, onLightbox, fetchWikiScreenshots }) {
+function DetailView({ game, games, setGames, toast, apiKey, onEdit, onDelete, onRefresh, onLightbox, fetchWikiScreenshots, ebayCid, ebayCs }) {
   const [screenshots, setScreenshots] = useState(game.screenshots || []);
   const [ebayPrice, setEbayPrice] = useState(null);
   const [ebayLoading, setEbayLoading] = useState(false);
@@ -755,7 +768,11 @@ function DetailView({ game, games, setGames, toast, apiKey, onEdit, onDelete, on
     setEbayError('');
     setEbayPrice(null);
     try {
-      const r = await fetch(`/api/ebay/price?q=${encodeURIComponent(game.titre + ' ' + game.console)}`);
+      const r = await fetch('/api/ebay/price', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ q: game.titre + ' ' + game.console, cid: ebayCid, cs: ebayCs })
+      });
       const d = await r.json();
       if (d.error) { setEbayError(d.error); return; }
       setEbayPrice(d);

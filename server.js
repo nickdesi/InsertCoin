@@ -10,19 +10,19 @@ app.get('/api/ebay/config', (req, res) => {
   res.json({ configured: !!process.env.EBAY_CLIENT_ID });
 });
 
-app.get('/api/ebay/price', async (req, res) => {
+app.post('/api/ebay/price', async (req, res) => {
   try {
-    const { q } = req.query;
+    const { q, cid, cs } = req.body;
     if (!q) return res.status(400).json({ error: 'Missing q' });
-    const cid = process.env.EBAY_CLIENT_ID;
-    const cs = process.env.EBAY_CLIENT_SECRET;
-    if (!cid || !cs) return res.json({ error: 'eBay non configuré. Ajoute EBAY_CLIENT_ID et EBAY_CLIENT_SECRET dans Coolify.' });
+    const clientId = cid || process.env.EBAY_CLIENT_ID;
+    const clientSecret = cs || process.env.EBAY_CLIENT_SECRET;
+    if (!clientId || !clientSecret) return res.json({ error: 'eBay non configuré. Renseigne les clés dans les paramètres de l\'app.' });
 
     const tok = await fetch('https://api.ebay.com/identity/v1/oauth2/token', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded',
-        Authorization: 'Basic ' + Buffer.from(cid + ':' + cs).toString('base64')
+        Authorization: 'Basic ' + Buffer.from(clientId + ':' + clientSecret).toString('base64')
       },
       body: 'grant_type=client_credentials&scope=https://api.ebay.com/oauth/api_scope'
     });
