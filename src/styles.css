@@ -293,6 +293,12 @@ select.form-control { cursor: pointer; appearance: none; background-image: url("
 .user-badge { display: flex; align-items: center; gap: 6px; padding: 6px 12px; background: rgba(255,255,255,0.05); border: 1px solid var(--border); border-radius: 8px; color: var(--text2); font-size: var(--font-xs); cursor: pointer; transition: var(--transition); white-space: nowrap; }
 .user-badge:hover { background: rgba(239,68,68,0.15); border-color: var(--danger); color: var(--danger); }
 .user-badge span { max-width: 100px; overflow: hidden; text-overflow: ellipsis; }
+.btn-sm { padding: 0.4rem 0.8rem; font-size: var(--font-xs); border-radius: 6px; }
+.ebay-error { font-size: var(--font-xs); color: var(--text3); margin-top: 0.3rem; }
+.detail-ebay { margin-top: 0.8rem; }
+.ebay-results { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; margin-top: 0.4rem; background: rgba(0,0,0,0.3); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 0.6rem 0.8rem; }
+.ebay-avg { font-size: 1.2rem; font-weight: 700; color: var(--accent); }
+.ebay-range { font-size: var(--font-xs); color: var(--text3); }
 
 /* Responsive */
 @media (max-width: 768px) {

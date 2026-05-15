@@ -732,6 +732,9 @@ export default function App() {
 
 function DetailView({ game, games, setGames, toast, apiKey, onEdit, onDelete, onRefresh, onLightbox, fetchWikiScreenshots }) {
   const [screenshots, setScreenshots] = useState(game.screenshots || []);
+  const [ebayPrice, setEbayPrice] = useState(null);
+  const [ebayLoading, setEbayLoading] = useState(false);
+  const [ebayError, setEbayError] = useState('');
   const hasScreenshots = screenshots.length > 0;
 
   useEffect(() => {
@@ -746,6 +749,19 @@ function DetailView({ game, games, setGames, toast, apiKey, onEdit, onDelete, on
       });
     }
   }, [game.rawgId, game.screenshots?.length]);
+
+  async function fetchEbayPrice() {
+    setEbayLoading(true);
+    setEbayError('');
+    setEbayPrice(null);
+    try {
+      const r = await fetch(`/api/ebay/price?q=${encodeURIComponent(game.titre + ' ' + game.console)}`);
+      const d = await r.json();
+      if (d.error) { setEbayError(d.error); return; }
+      setEbayPrice(d);
+    } catch { setEbayError('Erreur de connexion'); }
+    setEbayLoading(false);
+  }
 
   const coverHtml = game.couverture
     ? <img className="detail-cover" src={game.couverture} alt="" onError={e => e.target.style.display = 'none'} />
@@ -774,6 +790,21 @@ function DetailView({ game, games, setGames, toast, apiKey, onEdit, onDelete, on
       </div>
       {game.description ? <div className="detail-desc"><div className="lbl">Description</div><p>{game.description}</p></div> : null}
       {game.notes ? <div className="detail-desc" style={{ marginTop: 8 }}><div className="lbl">Notes perso</div><p>{game.notes}</p></div> : null}
+      <div className="detail-ebay">
+        <button className="btn btn-sm" onClick={fetchEbayPrice} disabled={ebayLoading}>
+          {ebayLoading ? 'Recherche...' : '💰 Prix eBay'}
+        </button>
+        {ebayError && <p className="ebay-error">{ebayError}</p>}
+        {ebayPrice && <div className="ebay-results">
+          <span className="ebay-avg">{ebayPrice.avg.toFixed(2).replace('.', ',')} €</span>
+          <span className="ebay-range">min {ebayPrice.min.toFixed(2).replace('.', ',')} € · max {ebayPrice.max.toFixed(2).replace('.', ',')} € · {ebayPrice.count} annonces</span>
+          <button className="btn btn-sm btn-primary" onClick={() => {
+            setGames(g => g.map(x => x.id === game.id ? { ...x, prix: String(ebayPrice.avg) } : x));
+            toast('Prix enregistré', 'success');
+            setEbayPrice(null);
+          }}>Appliquer ce prix</button>
+        </div>}
+      </div>
     </div>
     <div className="detail-footer">
       <button className="btn btn-secondary" onClick={onEdit}><Search size={14} /> Modifier</button>
