@@ -233,6 +233,9 @@ select.form-control { cursor: pointer; appearance: none; background-image: url("
 .pw-toggle { position: absolute; right: 10px; bottom: 8px; background: none; border: none; color: var(--text3); padding: 4px; }
 .link-btn { background: none; border: none; color: var(--primary-light); cursor: pointer; font-size: inherit; text-decoration: underline; }
 .link-btn:hover { color: var(--accent); }
+.platform-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.6rem; }
+.platform-btn { padding: 0.8rem 1rem; background: rgba(255,255,255,0.04); border: 1px solid var(--border); border-radius: var(--radius-sm); color: var(--text); font-weight: 600; cursor: pointer; transition: var(--transition); text-align: center; }
+.platform-btn:hover { background: rgba(109,40,217,0.15); border-color: var(--primary); transform: translateY(-2px); }
 
 .rawg-row { display: flex; gap: 0.5rem; margin-bottom: 0.5rem; }
 .rawg-results { margin-bottom: 1rem; display: grid; gap: 0.4rem; max-height: 200px; overflow-y: auto; }

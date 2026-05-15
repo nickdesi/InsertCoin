@@ -135,6 +135,7 @@ export default function App() {
   const [statsOpen, setStatsOpen] = useState(false);
   const [toasts, setToasts] = useState([]);
   const [lightboxSrc, setLightboxSrc] = useState(null);
+  const [platformPicker, setPlatformPicker] = useState({ open: false, platforms: [], data: null });
   const lastRawgId = useRef(null);
 
   const storageKey = `ludotheque_v2_${user}`;
@@ -176,6 +177,23 @@ export default function App() {
     return '';
   }
 
+  function listConsoleMatches(rawgPlatforms) {
+    if (!rawgPlatforms?.length) return [];
+    const seen = new Set();
+    const result = [];
+    for (const entry of rawgPlatforms) {
+      const name = entry.platform?.name;
+      if (!name) continue;
+      const m = PLATFORM_MAP[name.toLowerCase().trim()];
+      if (m && CONSOLES.includes(m) && !seen.has(m)) { seen.add(m); result.push(m); continue; }
+      const exact = CONSOLES.find(c => c.toLowerCase() === name.toLowerCase());
+      if (exact && !seen.has(exact)) { seen.add(exact); result.push(exact); continue; }
+      const partial = CONSOLES.find(c => c.toLowerCase().includes(name.toLowerCase()) || name.toLowerCase().includes(c.toLowerCase()));
+      if (partial && !seen.has(partial)) { seen.add(partial); result.push(partial); }
+    }
+    return result;
+  }
+
   function matchGenre(genres) {
     if (!genres || !genres.length) return 'Action';
     for (const g of genres) { const m = GENRE_MAP[g.name?.toLowerCase().trim()]; if (m) return m; }
@@ -203,33 +221,42 @@ export default function App() {
       const r = await fetch(`https://api.rawg.io/api/games/${rawgId}?key=${apiKey}&language=fr`);
       if (!r.ok) { toast('Erreur API RAWG', 'error'); return; }
       const g = await r.json();
-      const consoleVal = matchConsole(g.platforms);
-      const genreVal = matchGenre(g.genres);
-      const note = g.rating ? Math.max(1, Math.min(5, Math.round(g.rating))) : 0;
-      const desc = g.description_raw || '';
-      const dev = g.developers?.[0]?.name || '';
-      const pub = g.publishers?.[0]?.name || '';
-
-      setForm(f => ({ ...f, titre: g.name || f.titre, console: consoleVal, genre: genreVal, annee: g.released ? g.released.split('-')[0] : f.annee, couverture: g.background_image || f.couverture, note, description: desc, developpeur: dev, editeur: pub, rawgId }));
-      setRawgResults([]);
-      lastRawgId.current = rawgId;
-
-      toast(`"${g.name}" chargé depuis RAWG`, 'success');
-
-      fetch(`https://api.rawg.io/api/games/${rawgId}/screenshots?key=${apiKey}`).then(r => r.ok && r.json()).then(d => {
-        if (lastRawgId.current !== rawgId) return;
-        const urls = (d?.results || []).map(s => s.image).filter(Boolean);
-        setForm(f => ({ ...f, screenshots: urls }));
-      }).catch(() => {});
-
-      fetchWikipedia(g.name, consoleVal).then(wiki => {
-        if (lastRawgId.current !== rawgId) return;
-        if (!wiki) return;
-        if (wiki.description && wiki.description.length > 80) {
-          setForm(f => ({ ...f, description: wiki.description }));
-        }
-      });
+      const matches = listConsoleMatches(g.platforms);
+      if (matches.length <= 1) {
+        fillFormFromRawg(g, matches[0] || '');
+      } else {
+        setPlatformPicker({ open: true, platforms: matches, data: g });
+      }
     } catch (e) { toast('Erreur chargement RAWG', 'error'); }
+  }
+
+  function fillFormFromRawg(g, consoleVal) {
+    const genreVal = matchGenre(g.genres);
+    const note = g.rating ? Math.max(1, Math.min(5, Math.round(g.rating))) : 0;
+    const desc = g.description_raw || '';
+    const dev = g.developers?.[0]?.name || '';
+    const pub = g.publishers?.[0]?.name || '';
+    const rawgId = g.id;
+
+    setForm(f => ({ ...f, titre: g.name, console: consoleVal, genre: genreVal, annee: g.released ? g.released.split('-')[0] : '', couverture: g.background_image || '', note, description: desc, developpeur: dev, editeur: pub, rawgId }));
+    setRawgResults([]);
+    lastRawgId.current = rawgId;
+
+    toast(`"${g.name}" chargé depuis RAWG`, 'success');
+
+    fetch(`https://api.rawg.io/api/games/${rawgId}/screenshots?key=${apiKey}`).then(r => r.ok && r.json()).then(d => {
+      if (lastRawgId.current !== rawgId) return;
+      const urls = (d?.results || []).map(s => s.image).filter(Boolean);
+      setForm(f => ({ ...f, screenshots: urls }));
+    }).catch(() => {});
+
+    fetchWikipedia(g.name, consoleVal).then(wiki => {
+      if (lastRawgId.current !== rawgId) return;
+      if (!wiki) return;
+      if (wiki.description && wiki.description.length > 80) {
+        setForm(f => ({ ...f, description: wiki.description }));
+      }
+    });
   }
 
   async function fetchWikipedia(titre, console) {
@@ -623,6 +650,23 @@ export default function App() {
           <input className="form-control" value={apiKey} onChange={e => setApiKey(e.target.value)} placeholder="Colle ta clé ici" style={{ fontFamily: 'monospace' }} />
         </div>
         <button className="btn btn-primary btn-full" onClick={() => { setApiKey(apiKey); setApiOpen(false); toast('Clé API enregistrée', 'success'); }}>Enregistrer</button>
+      </Modal>
+
+      {/* Platform Picker */}
+      <Modal open={platformPicker.open} onClose={() => setPlatformPicker({ open: false, platforms: [], data: null })} title="Choisis la console">
+        <p style={{ color: 'var(--text2)', fontSize: 'var(--font-sm)', marginBottom: '1rem' }}>
+          "{platformPicker.data?.name}" est disponible sur plusieurs consoles :
+        </p>
+        <div className="platform-grid">
+          {platformPicker.platforms.map(p => (
+            <button key={p} className="platform-btn" onClick={() => {
+              fillFormFromRawg(platformPicker.data, p);
+              setPlatformPicker({ open: false, platforms: [], data: null });
+            }}>
+              {p}
+            </button>
+          ))}
+        </div>
       </Modal>
 
       {/* Lightbox */}
