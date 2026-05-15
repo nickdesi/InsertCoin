@@ -100,6 +100,14 @@ const GENRE_MAP = {
   pinball: 'Autre', 'text-based': 'Aventure', 'interactive fiction': 'Aventure'
 };
 
+function genId() {
+  if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID();
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
+    const r = Math.random() * 16 | 0;
+    return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
+  });
+}
+
 export default function App() {
   const [games, setGames] = useState(() => { try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) || []; } catch { return []; } });
   const [apiKey, setApiKeyRaw] = useState(() => localStorage.getItem(API_KEY) || '');
@@ -265,7 +273,7 @@ export default function App() {
     if (!form.titre.trim()) return;
     const game = {
       ...form,
-      id: editingId || crypto.randomUUID(),
+      id: editingId || genId(),
       titre: form.titre.trim(),
       annee: String(form.annee || '').trim(),
       dateAjout: editingId ? games.find(g => g.id === editingId)?.dateAjout || Date.now() : Date.now(),
