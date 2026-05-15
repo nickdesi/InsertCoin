@@ -1,9 +1,10 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
-import { Download, Gamepad2, Ghost, KeyRound, Plus, Search, Trash2, X, Upload, Dice5, LayoutGrid, List, ChartPie, ChevronDown, ChevronUp, Maximize2 } from 'lucide-react';
+import { Download, Gamepad2, Ghost, KeyRound, Plus, Search, Trash2, X, Upload, Dice5, LayoutGrid, List, ChartPie, ChevronDown, ChevronUp, Maximize2, LogOut, User, Shield, Eye, EyeOff } from 'lucide-react';
 import './styles.css';
 
-const STORAGE_KEY = 'ludotheque_v2';
+const AUTH_USER_KEY = 'insertcoin_user';
+const AUTH_USERS_KEY = 'insertcoin_users';
 const API_KEY = 'rawg_api_key';
 
 const CONSOLES = [
@@ -109,8 +110,15 @@ function genId() {
 }
 
 export default function App() {
-  const [games, setGames] = useState(() => { try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) || []; } catch { return []; } });
-  const [apiKey, setApiKeyRaw] = useState(() => localStorage.getItem(API_KEY) || '');
+  const [user, setUser] = useState(() => localStorage.getItem(AUTH_USER_KEY) || '');
+  const apiKeyPref = `${API_KEY}${user ? '_' + user : ''}`;
+
+  const [games, setGames] = useState(() => {
+    if (!user) return [];
+    const key = `ludotheque_v2_${user}`;
+    try { return JSON.parse(localStorage.getItem(key)) || []; } catch { return []; }
+  });
+  const [apiKey, setApiKeyRaw] = useState(() => localStorage.getItem(apiKeyPref) || '');
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState({ family: 'all', console: 'all', decade: 'all' });
   const [view, setView] = useState('grid');
@@ -130,8 +138,19 @@ export default function App() {
   const [pendingRawg, setPendingRawg] = useState(null);
   const lastRawgId = useRef(null);
 
-  useEffect(() => localStorage.setItem(STORAGE_KEY, JSON.stringify(games)), [games]);
-  const setApiKey = (k) => { localStorage.setItem(API_KEY, k.trim()); setApiKeyRaw(k.trim()); };
+  const storageKey = `ludotheque_v2_${user}`;
+  useEffect(() => { if (user) localStorage.setItem(storageKey, JSON.stringify(games)); }, [user, storageKey, games]);
+  const setApiKey = (k) => { localStorage.setItem(apiKeyPref, k.trim()); setApiKeyRaw(k.trim()); };
+
+  function logout() {
+    localStorage.removeItem(AUTH_USER_KEY);
+    setUser('');
+  }
+
+  function login(username) {
+    localStorage.setItem(AUTH_USER_KEY, username);
+    setUser(username);
+  }
 
   const toast = useCallback((msg, type = 'info') => {
     const id = Date.now();
@@ -364,6 +383,8 @@ export default function App() {
     setFilter({ family: 'all', console, decade: filter.decade });
   }
 
+  if (!user) return <AuthScreen onLogin={login} />;
+
   const allConsoles = useMemo(() => ['all', ...new Set(games.map(g => g.console))].sort((a, b) => a === 'all' ? -1 : b === 'all' ? 1 : a.localeCompare(b)), [games]);
   const hasGames = games.length > 0;
   const finished = games.filter(g => g.statut === 'fini').length;
@@ -388,7 +409,10 @@ export default function App() {
           <div className="brand-icon"><Gamepad2 size={24} /></div>
           <div><h1>InsertCoin</h1><p>Gère ta collection retrogaming</p></div>
         </div>
-        <div className="bento stats" style={{ padding: '1rem' }}>
+        <div className="bento stats" style={{ padding: '1rem', position: 'relative' }}>
+          <button className="user-badge" onClick={logout} title="Se déconnecter">
+            <User size={14} /><span>{user}</span><LogOut size={12} />
+          </button>
           <div className="stat"><span className="stat-val">{games.length}</span><span className="stat-lbl">Jeux</span></div>
           <div className="stat"><span className="stat-val">{finished}</span><span className="stat-lbl">Finis</span></div>
           <div className="stat"><span className="stat-val">{platforms}</span><span className="stat-lbl">Consoles</span></div>
@@ -680,6 +704,59 @@ function Modal({ open, onClose, title, children }) {
         </div>
         {children}
       </section>
+    </div>
+  );
+}
+
+function AuthScreen({ onLogin }) {
+  const [mode, setMode] = useState('login');
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
+  const [showPw, setShowPw] = useState(false);
+
+  function handleSubmit(e) {
+    e.preventDefault();
+    setError('');
+    if (!username.trim() || !password.trim()) { setError('Tous les champs sont requis'); return; }
+    const users = JSON.parse(localStorage.getItem(AUTH_USERS_KEY) || '{}');
+    if (mode === 'login') {
+      if (!users[username]) { setError('Utilisateur inconnu'); return; }
+      if (users[username] !== password) { setError('Mot de passe incorrect'); return; }
+      onLogin(username);
+    } else {
+      if (users[username]) { setError('Ce nom existe déjà'); return; }
+      if (password.length < 3) { setError('Mot de passe trop court (min 3)'); return; }
+      users[username] = password;
+      localStorage.setItem(AUTH_USERS_KEY, JSON.stringify(users));
+      onLogin(username);
+    }
+  }
+
+  return (
+    <div className="auth-screen">
+      <div className="auth-card">
+        <div className="auth-icon"><Shield size={32} /></div>
+        <h1>InsertCoin</h1>
+        <p className="auth-sub">Gère ta collection retrogaming</p>
+        <form onSubmit={handleSubmit}>
+          <div className="form-group">
+            <span>Utilisateur</span>
+            <input className="form-control" value={username} onChange={e => setUsername(e.target.value)} placeholder="Pseudo" autoFocus />
+          </div>
+          <div className="form-group" style={{ position: 'relative' }}>
+            <span>Mot de passe</span>
+            <input className="form-control" type={showPw ? 'text' : 'password'} value={password} onChange={e => setPassword(e.target.value)} placeholder="••••••" />
+            <button type="button" className="pw-toggle" onClick={() => setShowPw(!showPw)}>{showPw ? <EyeOff size={16} /> : <Eye size={16} />}</button>
+          </div>
+          {error && <p className="form-error">{error}</p>}
+          <button className="btn btn-primary btn-full" type="submit">{mode === 'login' ? 'Connexion' : 'Créer mon compte'}</button>
+        </form>
+        <p className="auth-switch">
+          {mode === 'login' ? <>Pas encore de compte ? <button className="link-btn" onClick={() => { setMode('register'); setError(''); }}>Créer un compte</button></>
+            : <>Déjà un compte ? <button className="link-btn" onClick={() => { setMode('login'); setError(''); }}>Se connecter</button></>}
+        </p>
+      </div>
     </div>
   );
 }
