@@ -135,7 +135,6 @@ export default function App() {
   const [statsOpen, setStatsOpen] = useState(false);
   const [toasts, setToasts] = useState([]);
   const [lightboxSrc, setLightboxSrc] = useState(null);
-  const [pendingRawg, setPendingRawg] = useState(null);
   const lastRawgId = useRef(null);
 
   const storageKey = `ludotheque_v2_${user}`;
@@ -213,7 +212,6 @@ export default function App() {
 
       setForm(f => ({ ...f, titre: g.name || f.titre, console: consoleVal, genre: genreVal, annee: g.released ? g.released.split('-')[0] : f.annee, couverture: g.background_image || f.couverture, note, description: desc, developpeur: dev, editeur: pub, rawgId }));
       setRawgResults([]);
-      setPendingRawg({ description: desc, developpeur: dev, editeur: pub, rawgId, screenshots: [] });
       lastRawgId.current = rawgId;
 
       toast(`"${g.name}" chargé depuis RAWG`, 'success');
@@ -221,7 +219,6 @@ export default function App() {
       fetch(`https://api.rawg.io/api/games/${rawgId}/screenshots?key=${apiKey}`).then(r => r.ok && r.json()).then(d => {
         if (lastRawgId.current !== rawgId) return;
         const urls = (d?.results || []).map(s => s.image).filter(Boolean);
-        setPendingRawg(p => p ? { ...p, screenshots: urls } : p);
         setForm(f => ({ ...f, screenshots: urls }));
       }).catch(() => {});
 
@@ -230,7 +227,6 @@ export default function App() {
         if (!wiki) return;
         if (wiki.description && wiki.description.length > 80) {
           setForm(f => ({ ...f, description: wiki.description }));
-          setPendingRawg(p => p ? { ...p, description: wiki.description } : p);
         }
       });
     } catch (e) { toast('Erreur chargement RAWG', 'error'); }
@@ -304,7 +300,7 @@ export default function App() {
   }
 
   function openForm(game) {
-    setRawgQuery(''); setRawgResults([]); setRawgError(''); setPendingRawg(null);
+    setRawgQuery(''); setRawgResults([]); setRawgError('');
     setEditingId(game?.id || '');
     const defaults = { titre: '', console: '', genre: 'Action', annee: '', couverture: '', note: 0, statut: 'possede', notes: '', description: '', developpeur: '', editeur: '', screenshots: [], rawgId: null };
     setForm(game ? { ...defaults, ...game, notes: game.notes && game.notes !== game.description ? game.notes : '' } : { ...defaults });
@@ -746,7 +742,7 @@ function AuthScreen({ onLogin }) {
           </div>
           <div className="form-group" style={{ position: 'relative' }}>
             <span>Mot de passe</span>
-            <input className="form-control" type={showPw ? 'text' : 'password'} value={password} onChange={e => setPassword(e.target.value)} placeholder="••••••" />
+            <input className="form-control" type={showPw ? 'text' : 'password'} autoComplete={mode === 'login' ? 'current-password' : 'new-password'} value={password} onChange={e => setPassword(e.target.value)} placeholder="••••••" />
             <button type="button" className="pw-toggle" onClick={() => setShowPw(!showPw)}>{showPw ? <EyeOff size={16} /> : <Eye size={16} />}</button>
           </div>
           {error && <p className="form-error">{error}</p>}
