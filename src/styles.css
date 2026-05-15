@@ -39,11 +39,15 @@ body {
 button, input, select, textarea { font: inherit; color: inherit; }
 button { cursor: pointer; }
 input, select, textarea { outline: none; }
+:focus-visible { outline: 2px solid var(--primary-light); outline-offset: 2px; border-radius: 4px; }
+:focus:not(:focus-visible) { outline: none; }
 
 @keyframes fadeIn { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
 .fade-in { animation: fadeIn 0.4s ease both; }
 @keyframes modalEnter { from { opacity: 0; transform: translateY(30px) scale(0.95); } to { opacity: 1; transform: translateY(0) scale(1); } }
 @keyframes slideUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; } }
 
 /* Header */
 .header { max-width: 1400px; margin: 1.5rem auto; padding: 0 1.5rem; display: grid; grid-template-columns: 1fr auto; gap: 1.5rem; }
@@ -53,8 +57,9 @@ input, select, textarea { outline: none; }
 .header h1 { font-size: 2rem; font-weight: 800; letter-spacing: -0.03em; background: linear-gradient(to right, #fff, #a78bfa); -webkit-background-clip: text; color: transparent; }
 .header p { color: var(--text2); font-size: var(--font-sm); }
 .stats { display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.8rem; min-width: 280px; }
-.stat { background: rgba(255,255,255,0.03); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 1rem; display: flex; flex-direction: column; transition: var(--transition); }
+.stat { background: rgba(255,255,255,0.03); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 1rem; display: flex; flex-direction: column; transition: var(--transition); cursor: pointer; }
 .stat:hover { background: rgba(255,255,255,0.06); transform: translateY(-2px); }
+.stat:active { transform: scale(0.97); }
 .stat-val { font-size: 1.6rem; font-weight: 700; line-height: 1; }
 .stat-lbl { font-size: var(--font-xs); color: var(--text2); text-transform: uppercase; letter-spacing: 0.05em; margin-top: 0.2rem; }
 
@@ -293,24 +298,37 @@ select.form-control { cursor: pointer; appearance: none; background-image: url("
 .user-badge { display: flex; align-items: center; gap: 6px; padding: 6px 12px; background: rgba(255,255,255,0.05); border: 1px solid var(--border); border-radius: 8px; color: var(--text2); font-size: var(--font-xs); cursor: pointer; transition: var(--transition); white-space: nowrap; }
 .user-badge:hover { background: rgba(239,68,68,0.15); border-color: var(--danger); color: var(--danger); }
 .user-badge span { max-width: 100px; overflow: hidden; text-overflow: ellipsis; }
-.btn-sm { padding: 0.4rem 0.8rem; font-size: var(--font-xs); border-radius: 6px; }
-.ebay-error { font-size: var(--font-xs); color: var(--text3); margin-top: 0.3rem; }
-.detail-ebay { margin-top: 0.8rem; }
-.ebay-results { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; margin-top: 0.4rem; background: rgba(0,0,0,0.3); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 0.6rem 0.8rem; }
-.ebay-avg { font-size: 1.2rem; font-weight: 700; color: var(--accent); }
+.btn-sm { padding: 0.5rem 1rem; font-size: var(--font-sm); border-radius: 8px; min-height: 36px; }
+.btn-sm:disabled { opacity: 0.5; cursor: not-allowed; }
+.btn-spinner { display: inline-block; width: 14px; height: 14px; border: 2px solid currentColor; border-top-color: transparent; border-radius: 50%; animation: spin 0.6s linear infinite; }
+.ebay-error { font-size: var(--font-xs); color: var(--text3); margin-top: 0.4rem; }
+.detail-ebay { margin-top: 1rem; }
+.ebay-results { background: linear-gradient(135deg, rgba(16,185,129,0.08), rgba(5,5,10,0.3)); border: 1px solid rgba(16,185,129,0.2); border-radius: var(--radius-sm); padding: 0.8rem 1rem; display: flex; flex-wrap: wrap; align-items: center; gap: 0.6rem; animation: fadeIn 0.3s ease both; }
+.ebay-avg { font-size: 1.3rem; font-weight: 800; color: var(--accent); letter-spacing: -0.02em; }
 .ebay-range { font-size: var(--font-xs); color: var(--text3); }
+.ebay-results .btn-sm { background: var(--accent); color: #000; font-weight: 700; border: none; }
+.ebay-results .btn-sm:hover { background: #059669; }
 
 /* Responsive */
 @media (max-width: 768px) {
-  .header { grid-template-columns: 1fr; }
-  .stats { min-width: 0; grid-template-columns: repeat(4, 1fr); }
-  .stat-val { font-size: 1.2rem; }
+  .header { grid-template-columns: 1fr; gap: 1rem; margin: 1rem auto; }
+  .stats { min-width: 0; grid-template-columns: repeat(4, 1fr); gap: 0.5rem; }
+  .stat { padding: 0.7rem; }
+  .stat-val { font-size: 1.1rem; }
   .games-grid { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 0.8rem; }
   .form-grid { grid-template-columns: 1fr; }
   .header, .controls, .filters, .main { padding-left: 1rem; padding-right: 1rem; }
   .game-card:hover { transform: translateY(-4px) !important; }
+  .controls { gap: 0.5rem; }
+  .btn { padding: 0.6rem 1rem; min-height: 40px; }
+  .platform-grid { grid-template-columns: 1fr; }
 }
 @media (max-width: 480px) {
   .games-grid { grid-template-columns: repeat(2, 1fr); gap: 0.6rem; }
   .stats { grid-template-columns: repeat(2, 1fr); }
+  .header h1 { font-size: 1.4rem; }
+  .brand { gap: 0.7rem; }
+  .brand-icon { width: 40px; height: 40px; }
+  .btn { font-size: var(--font-xs); }
+  .stat-val { font-size: 1rem; }
 }

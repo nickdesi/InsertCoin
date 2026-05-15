@@ -808,8 +808,7 @@ function DetailView({ game, games, setGames, toast, apiKey, onEdit, onDelete, on
       {game.description ? <div className="detail-desc"><div className="lbl">Description</div><p>{game.description}</p></div> : null}
       {game.notes ? <div className="detail-desc" style={{ marginTop: 8 }}><div className="lbl">Notes perso</div><p>{game.notes}</p></div> : null}
       <div className="detail-ebay">
-        <button className="btn btn-sm" onClick={fetchEbayPrice} disabled={ebayLoading}>
-          {ebayLoading ? 'Recherche...' : '💰 Prix eBay'}
+        <button className="btn btn-sm" onClick={fetchEbayPrice} disabled={ebayLoading}>{ebayLoading ? <span className="btn-spinner" /> : '💰'} Prix eBay
         </button>
         {ebayError && <p className="ebay-error">{ebayError}</p>}
         {ebayPrice && <div className="ebay-results">
