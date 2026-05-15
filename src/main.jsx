@@ -238,7 +238,7 @@ export default function App() {
     const pub = g.publishers?.[0]?.name || '';
     const rawgId = g.id;
 
-    setForm(f => ({ ...f, titre: g.name, console: consoleVal, genre: genreVal, annee: g.released ? g.released.split('-')[0] : '', couverture: g.background_image || '', note, description: desc, developpeur: dev, editeur: pub, rawgId }));
+    setForm(f => ({ ...f, titre: g.name, console: consoleVal, genre: genreVal, annee: g.released || '', couverture: g.background_image || '', note, description: desc, developpeur: dev, editeur: pub, rawgId }));
     setRawgResults([]);
     lastRawgId.current = rawgId;
 
@@ -253,14 +253,13 @@ export default function App() {
     fetchWikipedia(g.name, consoleVal).then(wiki => {
       if (lastRawgId.current !== rawgId) return;
       if (!wiki) return;
-      if (wiki.description && wiki.description.length > 80) {
-        setForm(f => ({ ...f, description: wiki.description }));
-      }
+      setForm(f => ({ ...f, ...(wiki.description && wiki.description.length > 80 ? { description: wiki.description } : {}), ...(wiki.releaseDate ? { annee: wiki.releaseDate } : {}) }));
     });
   }
 
   async function fetchWikipedia(titre, console) {
     const consoleKeywords = CONSOLES.map(c => c.toLowerCase().split(/\s+/)).flat();
+    const months = ['janvier','février','mars','avril','mai','juin','juillet','août','septembre','octobre','novembre','décembre'];
     const searchQueries = [
       titre,
       `${titre} ${console}`,
@@ -276,12 +275,19 @@ export default function App() {
           const consoleOnly = consoleKeywords.some(k => k.length > 2 && pageTitle.includes(k))
             && !pageTitle.includes(titre.toLowerCase());
           if (consoleOnly) continue;
-          const c = await fetch(`https://fr.wikipedia.org/w/api.php?action=query&prop=extracts|pageimages&explaintext&exchars=600&pithumbsize=400&titles=${encodeURIComponent(page.title)}&format=json&origin=*`);
+          const c = await fetch(`https://fr.wikipedia.org/w/api.php?action=query&prop=extracts|pageimages|pageprops&explaintext&exchars=600&pithumbsize=400&titles=${encodeURIComponent(page.title)}&format=json&origin=*`);
           const cd = await c.json();
           const pg = Object.values(cd.query.pages)[0];
           if (!pg) continue;
           const desc = pg.extract || '';
-          if (desc.length > 30) return { description: desc, coverUrl: pg.thumbnail?.source || null };
+          if (desc.length <= 30) continue;
+          let releaseDate = null;
+          const dateMatch = desc.match(/sortie?\s+(?:le\s+)?(\d{1,2})\s+(janvier|février|mars|avril|mai|juin|juillet|août|septembre|octobre|novembre|décembre)\s+(\d{4})/i);
+          if (dateMatch) {
+            const monthIndex = months.indexOf(dateMatch[2].toLowerCase()) + 1;
+            releaseDate = `${dateMatch[3]}-${String(monthIndex).padStart(2, '0')}-${String(dateMatch[1]).padStart(2, '0')}`;
+          }
+          return { description: desc, coverUrl: pg.thumbnail?.source || null, releaseDate };
         }
       } catch { continue; }
     }
@@ -589,8 +595,8 @@ export default function App() {
           </div>
           <div className="form-grid">
             <div className="form-group">
-              <span>Année</span>
-              <input className="form-control" type="number" min="1970" max="2030" value={form.annee} onChange={e => setForm(f => ({ ...f, annee: e.target.value }))} />
+              <span>Date de sortie</span>
+              <input className="form-control" type="date" min="1970-01-01" max="2030-12-31" value={form.annee} onChange={e => setForm(f => ({ ...f, annee: e.target.value }))} />
             </div>
             <div className="form-group">
               <span>Statut</span>
@@ -720,7 +726,7 @@ function DetailView({ game, games, setGames, toast, apiKey, onEdit, onDelete, on
       <div className="detail-grid">
         <div className="detail-item"><div className="lbl">Console</div><div className="val">{game.console || '—'}</div></div>
         <div className="detail-item"><div className="lbl">Genre</div><div className="val">{game.genre || '—'}</div></div>
-        <div className="detail-item"><div className="lbl">Année</div><div className="val">{game.annee || '—'}</div></div>
+        <div className="detail-item"><div className="lbl">Sortie</div><div className="val">{game.annee ? (game.annee.match(/^\d{4}-\d{2}-\d{2}$/) ? new Date(game.annee + 'T00:00:00').toLocaleDateString('fr-FR') : game.annee) : '—'}</div></div>
         <div className="detail-item"><div className="lbl">Statut</div><div className="val">{STATUTS[game.statut] || game.statut}</div></div>
         <div className="detail-item"><div className="lbl">Ma note</div><div className="val">{'★'.repeat(game.note || 0)}{'☆'.repeat(5 - (game.note || 0))}</div></div>
         <div className="detail-item"><div className="lbl">Ajouté</div><div className="val">{new Date(game.dateAjout).toLocaleDateString('fr-FR')}</div></div>
