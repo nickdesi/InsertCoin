@@ -128,7 +128,7 @@ export default function App() {
   const [detailOpen, setDetailOpen] = useState(false);
   const [detailGame, setDetailGame] = useState(null);
   const [apiOpen, setApiOpen] = useState(false);
-  const [form, setForm] = useState({ titre: '', console: '', genre: 'Action', annee: '', couverture: '', note: 0, statut: 'possede', notes: '', description: '', developpeur: '', editeur: '', screenshots: [], rawgId: null });
+  const [form, setForm] = useState({ titre: '', console: '', genre: 'Action', annee: '', couverture: '', note: 0, statut: 'possede', notes: '', description: '', developpeur: '', editeur: '', screenshots: [], rawgId: null, prix: '' });
   const [editingId, setEditingId] = useState('');
   const [rawgQuery, setRawgQuery] = useState('');
   const [rawgResults, setRawgResults] = useState([]);
@@ -369,7 +369,7 @@ export default function App() {
   function openForm(game) {
     setRawgQuery(''); setRawgResults([]); setRawgError('');
     setEditingId(game?.id || '');
-    const defaults = { titre: '', console: '', genre: 'Action', annee: '', couverture: '', note: 0, statut: 'possede', notes: '', description: '', developpeur: '', editeur: '', screenshots: [], rawgId: null };
+    const defaults = { titre: '', console: '', genre: 'Action', annee: '', couverture: '', note: 0, statut: 'possede', notes: '', description: '', developpeur: '', editeur: '', screenshots: [], rawgId: null, prix: '' };
     setForm(game ? { ...defaults, ...game, notes: game.notes && game.notes !== game.description ? game.notes : '' } : { ...defaults });
     setFormOpen(true);
   }
@@ -661,9 +661,15 @@ export default function App() {
             <span>Description</span>
             <textarea className="form-control" rows={3} value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} style={{ resize: 'vertical' }} placeholder="Description du jeu (auto-remplie via RAWG/Wikipedia)" />
           </div>
-          <div className="form-group">
-            <span>Notes personnelles</span>
-            <textarea className="form-control" rows={3} value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} style={{ resize: 'vertical' }} placeholder="Tes notes personnelles..." />
+          <div className="form-grid">
+            <div className="form-group">
+              <span>Valeur / Prix d'achat (€)</span>
+              <input className="form-control" type="number" min="0" step="0.01" value={form.prix} onChange={e => setForm(f => ({ ...f, prix: e.target.value }))} placeholder="0.00" />
+            </div>
+            <div className="form-group">
+              <span>Notes personnelles</span>
+              <textarea className="form-control" rows={3} value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} style={{ resize: 'vertical' }} placeholder="Tes notes personnelles..." />
+            </div>
           </div>
           <button className="btn btn-primary btn-full" type="submit">{editingId ? 'Modifier' : 'Ajouter'} le jeu</button>
         </form>
@@ -763,6 +769,7 @@ function DetailView({ game, games, setGames, toast, apiKey, onEdit, onDelete, on
         <div className="detail-item"><div className="lbl">Sortie</div><div className="val">{game.annee ? (game.annee.match(/^\d{4}-\d{2}-\d{2}$/) ? new Date(game.annee + 'T00:00:00').toLocaleDateString('fr-FR') : game.annee) : '—'}</div></div>
         <div className="detail-item"><div className="lbl">Statut</div><div className="val">{STATUTS[game.statut] || game.statut}</div></div>
         <div className="detail-item"><div className="lbl">Ma note</div><div className="val">{'★'.repeat(game.note || 0)}{'☆'.repeat(5 - (game.note || 0))}</div></div>
+        {game.prix ? <div className="detail-item"><div className="lbl">Valeur</div><div className="val">{parseFloat(game.prix).toFixed(2).replace('.', ',')} €</div></div> : null}
         <div className="detail-item"><div className="lbl">Ajouté</div><div className="val">{new Date(game.dateAjout).toLocaleDateString('fr-FR')}</div></div>
       </div>
       {game.description ? <div className="detail-desc"><div className="lbl">Description</div><p>{game.description}</p></div> : null}
