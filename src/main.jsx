@@ -210,23 +210,29 @@ export default function App() {
   }
 
   async function fetchWikipedia(titre, console) {
+    const consoleKeywords = CONSOLES.map(c => c.toLowerCase().split(/\s+/)).flat();
     const searchQueries = [
-      `${titre} ${console}`,
       titre,
+      `${titre} ${console}`,
       `${titre} jeu vidéo`
     ];
     for (const query of searchQueries) {
       try {
-        const s = await fetch(`https://fr.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(query)}&format=json&origin=*&srlimit=3`);
+        const s = await fetch(`https://fr.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(query)}&format=json&origin=*&srlimit=5`);
         const sd = await s.json();
-        const page = sd.query?.search?.[0];
-        if (!page) continue;
-        const c = await fetch(`https://fr.wikipedia.org/w/api.php?action=query&prop=extracts|pageimages&exintro&explaintext&pithumbsize=400&titles=${encodeURIComponent(page.title)}&format=json&origin=*`);
-        const cd = await c.json();
-        const pg = Object.values(cd.query.pages)[0];
-        if (!pg) continue;
-        const desc = pg.extract || '';
-        if (desc.length > 30) return { description: desc, coverUrl: pg.thumbnail?.source || null };
+        const pages = sd.query?.search || [];
+        for (const page of pages) {
+          const pageTitle = page.title.toLowerCase();
+          const consoleOnly = consoleKeywords.some(k => k.length > 2 && pageTitle.includes(k))
+            && !pageTitle.includes(titre.toLowerCase());
+          if (consoleOnly) continue;
+          const c = await fetch(`https://fr.wikipedia.org/w/api.php?action=query&prop=extracts|pageimages&exintro&explaintext&pithumbsize=400&titles=${encodeURIComponent(page.title)}&format=json&origin=*`);
+          const cd = await c.json();
+          const pg = Object.values(cd.query.pages)[0];
+          if (!pg) continue;
+          const desc = pg.extract || '';
+          if (desc.length > 30) return { description: desc, coverUrl: pg.thumbnail?.source || null };
+        }
       } catch { continue; }
     }
     return null;
