@@ -137,7 +137,7 @@ export default function App() {
   const [statsOpen, setStatsOpen] = useState(false);
   const [toasts, setToasts] = useState([]);
   const [lightboxSrc, setLightboxSrc] = useState(null);
-  const [platformPicker, setPlatformPicker] = useState({ open: false, platforms: [], data: null });
+  const [platformPicker, setPlatformPicker] = useState({ open: false, platforms: [], data: null, wiki: null });
   const lastRawgId = useRef(null);
 
   const storageKey = `ludotheque_v2_${user}`;
@@ -223,50 +223,44 @@ export default function App() {
       const r = await fetch(`https://api.rawg.io/api/games/${rawgId}?key=${apiKey}&language=fr`);
       if (!r.ok) { toast('Erreur API RAWG', 'error'); return; }
       const g = await r.json();
-      const matches = listConsoleMatches(g.platforms);
-      if (matches.length <= 1) {
-        fillFormFromRawg(g, matches[0] || '');
+      const rawgMatches = listConsoleMatches(g.platforms);
+      const wiki = await fetchWikipedia(g.name, rawgMatches[0] || '');
+      const merged = [...rawgMatches];
+      if (wiki?.platforms) { for (const p of wiki.platforms) { if (!merged.includes(p)) merged.push(p); } }
+      if (merged.length <= 1) {
+        fillFormFromRawg(g, merged[0] || '', wiki);
       } else {
-        setPlatformPicker({ open: true, platforms: matches, data: g });
+        setPlatformPicker({ open: true, platforms: merged, data: g, wiki });
       }
     } catch (e) { toast('Erreur chargement RAWG', 'error'); }
   }
 
-  function fillFormFromRawg(g, consoleVal) {
+  function fillFormFromRawg(g, consoleVal, wiki) {
     const genreVal = matchGenre(g.genres);
     const note = g.rating ? Math.max(1, Math.min(5, Math.round(g.rating))) : 0;
     const desc = g.description_raw || '';
-    const dev = g.developers?.[0]?.name || '';
-    const pub = g.publishers?.[0]?.name || '';
+    const dev = g.developers?.[0]?.name || wiki?.developpeur || '';
+    const pub = g.publishers?.[0]?.name || wiki?.editeur || '';
     const rawgId = g.id;
+    const date = wiki?.releaseDate || g.released || '';
 
-    setForm(f => ({ ...f, titre: g.name, console: consoleVal, genre: genreVal, annee: g.released || '', couverture: g.background_image || '', note, description: desc, developpeur: dev, editeur: pub, rawgId }));
+    setForm(f => ({ ...f, titre: g.name, console: consoleVal, genre: genreVal, annee: date, couverture: g.background_image || wiki?.coverUrl || '', note, description: wiki?.description && wiki.description.length > 80 ? wiki.description : (desc || ''), developpeur: dev, editeur: pub, rawgId }));
     setRawgResults([]);
     lastRawgId.current = rawgId;
 
-    toast(`"${g.name}" chargé depuis RAWG`, 'success');
+    toast(`"${g.name}" chargé`, 'success');
 
     fetch(`https://api.rawg.io/api/games/${rawgId}/screenshots?key=${apiKey}`).then(r => r.ok && r.json()).then(d => {
       if (lastRawgId.current !== rawgId) return;
       const urls = (d?.results || []).map(s => s.image).filter(Boolean);
       setForm(f => ({ ...f, screenshots: urls }));
     }).catch(() => {});
-
-    fetchWikipedia(g.name, consoleVal).then(wiki => {
-      if (lastRawgId.current !== rawgId) return;
-      if (!wiki) return;
-      setForm(f => ({ ...f, ...(wiki.description && wiki.description.length > 80 ? { description: wiki.description } : {}), ...(wiki.releaseDate ? { annee: wiki.releaseDate } : {}) }));
-    });
   }
 
   async function fetchWikipedia(titre, console) {
     const consoleKeywords = CONSOLES.map(c => c.toLowerCase().split(/\s+/)).flat();
     const months = ['janvier','février','mars','avril','mai','juin','juillet','août','septembre','octobre','novembre','décembre'];
-    const searchQueries = [
-      titre,
-      `${titre} ${console}`,
-      `${titre} jeu vidéo`
-    ];
+    const searchQueries = [titre, `${titre} ${console}`, `${titre} jeu vidéo`];
     for (const query of searchQueries) {
       try {
         const s = await fetch(`https://fr.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(query)}&format=json&origin=*&srlimit=5`);
@@ -274,8 +268,7 @@ export default function App() {
         const pages = sd.query?.search || [];
         for (const page of pages) {
           const pageTitle = page.title.toLowerCase();
-          const consoleOnly = consoleKeywords.some(k => k.length > 2 && pageTitle.includes(k))
-            && !pageTitle.includes(titre.toLowerCase());
+          const consoleOnly = consoleKeywords.some(k => k.length > 2 && pageTitle.includes(k)) && !pageTitle.includes(titre.toLowerCase());
           if (consoleOnly) continue;
           const c = await fetch(`https://fr.wikipedia.org/w/api.php?action=query&prop=extracts|pageimages|pageprops&explaintext&exchars=600&pithumbsize=400&titles=${encodeURIComponent(page.title)}&format=json&origin=*`);
           const cd = await c.json();
@@ -284,12 +277,51 @@ export default function App() {
           const desc = pg.extract || '';
           if (desc.length <= 30) continue;
           let releaseDate = null;
-          const dateMatch = desc.match(/sortie?\s+(?:le\s+)?(\d{1,2})\s+(janvier|février|mars|avril|mai|juin|juillet|août|septembre|octobre|novembre|décembre)\s+(\d{4})/i);
-          if (dateMatch) {
-            const monthIndex = months.indexOf(dateMatch[2].toLowerCase()) + 1;
-            releaseDate = `${dateMatch[3]}-${String(monthIndex).padStart(2, '0')}-${String(dateMatch[1]).padStart(2, '0')}`;
+          let platforms = null;
+          let developpeur = '';
+          let editeur = '';
+          let coverUrl = pg.thumbnail?.source || null;
+          const wikidataId = pg.pageprops?.wikibase_item;
+          if (wikidataId) {
+            try {
+              const wd = await fetch(`https://www.wikidata.org/wiki/Special:EntityData/${wikidataId}.json`);
+              const wdd = await wd.json();
+              const claims = wdd.entities[wikidataId]?.claims;
+              if (claims) {
+                const platIds = (claims.P400 || []).map(c => c.mainsnak?.datavalue?.value?.id).filter(Boolean);
+                if (platIds.length) {
+                  const labels = await fetch(`https://www.wikidata.org/w/api.php?action=wbgetentities&ids=${platIds.join('|')}&props=labels&languages=fr&format=json&origin=*`);
+                  const lbl = await labels.json();
+                  platforms = platIds.map(id => lbl.entities[id]?.labels?.fr?.value || null).filter(Boolean);
+                }
+                for (const claim of (claims.P577 || [])) {
+                  const countries = claim.qualifiers?.P291?.map(q => q.datavalue?.value?.id) || [];
+                  const time = claim.mainsnak?.datavalue?.value?.time;
+                  if (time && (countries.includes('Q142') || !releaseDate)) {
+                    releaseDate = time.replace(/^\+/, '').replace(/T.*$/, '');
+                    if (countries.includes('Q142')) break;
+                  }
+                }
+                const devId = claims.P178?.[0]?.mainsnak?.datavalue?.value?.id;
+                if (devId) {
+                  const dl = await fetch(`https://www.wikidata.org/w/api.php?action=wbgetentities&ids=${devId}&props=labels&languages=fr&format=json&origin=*`);
+                  const dd = await dl.json();
+                  developpeur = dd.entities[devId]?.labels?.fr?.value || '';
+                }
+                const pubId = claims.P123?.[0]?.mainsnak?.datavalue?.value?.id;
+                if (pubId) {
+                  const pl = await fetch(`https://www.wikidata.org/w/api.php?action=wbgetentities&ids=${pubId}&props=labels&languages=fr&format=json&origin=*`);
+                  const pd = await pl.json();
+                  editeur = pd.entities[pubId]?.labels?.fr?.value || '';
+                }
+              }
+            } catch {}
           }
-          return { description: desc, coverUrl: pg.thumbnail?.source || null, releaseDate };
+          if (!releaseDate) {
+            const dm = desc.match(/sortie?\s+(?:le\s+)?(\d{1,2})\s+(janvier|février|mars|avril|mai|juin|juillet|août|septembre|octobre|novembre|décembre)\s+(\d{4})/i);
+            if (dm) { const mi = months.indexOf(dm[2].toLowerCase()) + 1; releaseDate = `${dm[3]}-${String(mi).padStart(2,'0')}-${String(dm[1]).padStart(2,'0')}`; }
+          }
+          return { description: desc, coverUrl, releaseDate, platforms, developpeur, editeur };
         }
       } catch { continue; }
     }
@@ -668,8 +700,8 @@ export default function App() {
         <div className="platform-grid">
           {platformPicker.platforms.map(p => (
             <button key={p} className="platform-btn" onClick={() => {
-              fillFormFromRawg(platformPicker.data, p);
-              setPlatformPicker({ open: false, platforms: [], data: null });
+              fillFormFromRawg(platformPicker.data, p, platformPicker.wiki);
+              setPlatformPicker({ open: false, platforms: [], data: null, wiki: null });
             }}>
               {p}
             </button>
