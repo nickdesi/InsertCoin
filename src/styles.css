@@ -287,8 +287,9 @@ select.form-control { cursor: pointer; appearance: none; background-image: url("
 .auth-sub { color: var(--text2); font-size: var(--font-sm); margin-bottom: 1.5rem; }
 .auth-card .form-control { text-align: left; }
 .auth-switch { margin-top: 1rem; font-size: var(--font-sm); color: var(--text2); }
-.user-badge { position: absolute; top: 8px; right: 8px; display: flex; align-items: center; gap: 4px; padding: 4px 8px; background: rgba(255,255,255,0.05); border: 1px solid var(--border); border-radius: 8px; color: var(--text2); font-size: var(--font-xs); cursor: pointer; transition: var(--transition); z-index: 5; }
+.user-badge { display: flex; align-items: center; gap: 6px; padding: 6px 12px; background: rgba(255,255,255,0.05); border: 1px solid var(--border); border-radius: 8px; color: var(--text2); font-size: var(--font-xs); cursor: pointer; transition: var(--transition); white-space: nowrap; }
 .user-badge:hover { background: rgba(239,68,68,0.15); border-color: var(--danger); color: var(--danger); }
+.user-badge span { max-width: 100px; overflow: hidden; text-overflow: ellipsis; }
 
 /* Responsive */
 @media (max-width: 768px) {

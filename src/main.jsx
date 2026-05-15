@@ -401,16 +401,18 @@ export default function App() {
     <>
       {/* Header */}
       <header className="header">
-        <div className="bento brand">
-          <div className="brand-icon"><Gamepad2 size={24} /></div>
-          <div><h1>InsertCoin</h1><p>Gère ta collection retrogaming</p></div>
-        </div>
-        <div className="bento stats" style={{ padding: '1rem', position: 'relative' }}>
+        <div className="bento brand" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+            <div className="brand-icon"><Gamepad2 size={24} /></div>
+            <div><h1>InsertCoin</h1><p>Gère ta collection retrogaming</p></div>
+          </div>
           <button className="user-badge" onClick={logout} title="Se déconnecter">
             <User size={14} /><span>{user}</span><LogOut size={12} />
           </button>
+        </div>
+        <div className="bento stats" style={{ padding: '1rem' }}>
           <div className="stat"><span className="stat-val">{games.length}</span><span className="stat-lbl">Jeux</span></div>
-          <div className="stat"><span className="stat-val">{finished}</span><span className="stat-lbl">Finis</span></div>
+          <div className="stat"><span className="stat-val">{finished}</span><span className="stat-lbl">Fini</span></div>
           <div className="stat"><span className="stat-val">{platforms}</span><span className="stat-lbl">Consoles</span></div>
           <div className="stat"><span className="stat-val">{stats.avg}</span><span className="stat-lbl">Note moy.</span></div>
         </div>
