@@ -383,8 +383,6 @@ export default function App() {
     setFilter({ family: 'all', console, decade: filter.decade });
   }
 
-  if (!user) return <AuthScreen onLogin={login} />;
-
   const allConsoles = useMemo(() => ['all', ...new Set(games.map(g => g.console))].sort((a, b) => a === 'all' ? -1 : b === 'all' ? 1 : a.localeCompare(b)), [games]);
   const hasGames = games.length > 0;
   const finished = games.filter(g => g.statut === 'fini').length;
@@ -400,6 +398,8 @@ export default function App() {
     });
     return { byFamily, byDecade, fin, avg: rated ? (totalR / rated).toFixed(1) : '-' };
   }, [games]);
+
+  if (!user) return <AuthScreen onLogin={login} />;
 
   return (
     <>
