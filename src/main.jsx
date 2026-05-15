@@ -201,7 +201,7 @@ export default function App() {
       fetchWikipedia(g.name, consoleVal).then(wiki => {
         if (lastRawgId.current !== rawgId) return;
         if (!wiki) return;
-        if (wiki.description && wiki.description.length > 50) {
+        if (wiki.description && wiki.description.length > 80) {
           setForm(f => ({ ...f, description: wiki.description }));
           setPendingRawg(p => p ? { ...p, description: wiki.description } : p);
         }
@@ -226,7 +226,7 @@ export default function App() {
           const consoleOnly = consoleKeywords.some(k => k.length > 2 && pageTitle.includes(k))
             && !pageTitle.includes(titre.toLowerCase());
           if (consoleOnly) continue;
-          const c = await fetch(`https://fr.wikipedia.org/w/api.php?action=query&prop=extracts|pageimages&exintro&explaintext&pithumbsize=400&titles=${encodeURIComponent(page.title)}&format=json&origin=*`);
+          const c = await fetch(`https://fr.wikipedia.org/w/api.php?action=query&prop=extracts|pageimages&explaintext&exchars=600&pithumbsize=400&titles=${encodeURIComponent(page.title)}&format=json&origin=*`);
           const cd = await c.json();
           const pg = Object.values(cd.query.pages)[0];
           if (!pg) continue;
