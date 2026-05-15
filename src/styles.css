@@ -41,6 +41,7 @@ button { cursor: pointer; }
 input, select, textarea { outline: none; }
 
 @keyframes fadeIn { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
+.fade-in { animation: fadeIn 0.4s ease both; }
 @keyframes modalEnter { from { opacity: 0; transform: translateY(30px) scale(0.95); } to { opacity: 1; transform: translateY(0) scale(1); } }
 @keyframes slideUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
 
@@ -78,6 +79,7 @@ input, select, textarea { outline: none; }
 .btn-secondary { background: linear-gradient(135deg, rgba(15,15,20,0.7), rgba(20,20,30,0.8)); color: var(--text); border: 1px solid var(--border); }
 .btn-secondary:hover { background: rgba(30,30,40,0.9); border-color: rgba(255,255,255,0.15); transform: translateY(-1px); }
 .btn:active { transform: scale(0.94) !important; }
+.btn-full { width: 100%; justify-content: center; }
 
 /* Filters */
 .filters { max-width: 1400px; margin: 0 auto; padding: 0 1.5rem; }
@@ -227,6 +229,7 @@ input, select, textarea { outline: none; }
 select.form-control { cursor: pointer; appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='%2394a3b8' viewBox='0 0 16 16'%3E%3Cpath d='M8 11L3 6h10z'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 12px center; padding-right: 2rem; }
 .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.8rem; }
 .form-error { color: var(--danger); margin-bottom: 0.5rem; font-size: var(--font-sm); }
+.form-cover-preview { width: 100%; max-height: 160px; object-fit: contain; border-radius: var(--radius-sm); margin-top: 0.5rem; background: rgba(0,0,0,0.3); }
 
 .rawg-row { display: flex; gap: 0.5rem; margin-bottom: 0.5rem; }
 .rawg-results { margin-bottom: 1rem; display: grid; gap: 0.4rem; max-height: 200px; overflow-y: auto; }

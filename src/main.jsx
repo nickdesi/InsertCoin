@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { Download, Gamepad2, Ghost, KeyRound, Plus, Search, Trash2, X, Upload, Dice5, LayoutGrid, List, ChartPie, ChevronDown, ChevronUp, Maximize2 } from 'lucide-react';
 import './styles.css';
@@ -62,8 +62,10 @@ const PLATFORM_MAP = {
   'neo geo': 'Neo Geo AES', 'neo geo aes': 'Neo Geo AES', 'neo geo cd': 'Neo Geo CD',
   'neo geo mvs': 'Neo Geo MVS', 'mvs': 'Neo Geo MVS',
   'neo geo pocket color': 'Neo Geo Pocket Color', 'ngpc': 'Neo Geo Pocket Color',
-  'turbografx-16': 'TurboGrafx-16 / PC Engine', 'pc engine': 'TurboGrafx-16 / PC Engine',
-  'pc-fx': 'PC-FX', 'pc': 'PC', 'steam': 'PC', 'macos': 'PC', 'linux': 'PC', 'steam deck': 'Steam Deck',
+  'turbografx-16': 'TurboGrafx-16 / PC Engine', 'turbografx': 'TurboGrafx-16 / PC Engine', 'pc engine': 'TurboGrafx-16 / PC Engine',
+  'pc-fx': 'PC-FX',
+  'pc': 'PC', 'steam': 'PC', 'mac': 'PC', 'macos': 'PC', 'linux': 'PC', 'windows': 'PC',
+  'steam deck': 'Steam Deck', 'steamos': 'Steam Deck',
   'atari 2600': 'Atari 2600', 'atari 5200': 'Atari 5200', 'atari 7800': 'Atari 7800',
   'atari lynx': 'Atari Lynx', 'atari jaguar': 'Atari Jaguar',
   'commodore 64': 'Commodore 64', 'c64': 'Commodore 64', 'commodore amiga': 'Commodore Amiga',
@@ -71,13 +73,31 @@ const PLATFORM_MAP = {
   'philips cd-i': 'Philips CD-i', 'cd-i': 'Philips CD-i', '3do': '3DO'
 };
 
+const GENRE_OPTIONS = ['Action', 'Aventure', 'RPG', 'FPS', 'Plateforme', 'Combat', 'Course', 'Sport', 'Simulation', 'Stratégie', 'Puzzle', 'Horreur', 'Party Game', 'Open World', 'Roguelike', 'Metroidvania', 'Hack\'n\'Slash', 'Infiltration', 'Autre'];
+
 const GENRE_MAP = {
   action: 'Action', adventure: 'Aventure', rpg: 'RPG', shooter: 'FPS', 'first-person shooter': 'FPS',
   platformer: 'Plateforme', platform: 'Plateforme', fighting: 'Combat', racing: 'Course',
   sports: 'Sport', simulation: 'Simulation', strategy: 'Stratégie', puzzle: 'Puzzle',
   horror: 'Horreur', 'survival horror': 'Horreur', 'open world': 'Open World',
   roguelike: 'Roguelike', metroidvania: 'Metroidvania', 'hack and slash': 'Hack\'n\'Slash',
-  indie: 'Action', arcade: 'Action', party: 'Party Game', stealth: 'Infiltration'
+  indie: 'Indie', arcade: 'Arcade', party: 'Party Game', stealth: 'Infiltration',
+  'massively multiplayer': 'RPG', mmo: 'RPG', mmorpg: 'RPG', casual: 'Autre',
+  educational: 'Autre', card: 'Autre', 'board game': 'Autre', family: 'Autre',
+  'real time strategy': 'Stratégie', rts: 'Stratégie', 'tower defense': 'Stratégie',
+  'turn-based': 'RPG', 'turn-based strategy': 'Stratégie', tactical: 'Stratégie',
+  'point-and-click': 'Aventure', visualnovel: 'Aventure', 'visual novel': 'Aventure',
+  music: 'Autre', rhythm: 'Autre', trivia: 'Autre', quiz: 'Autre',
+  'battle royale': 'FPS', moba: 'Stratégie', looter: 'RPG', shooter: 'FPS',
+  dungeon: 'RPG', 'dungeon crawler': 'RPG', crafting: 'Simulation',
+  sandbox: 'Simulation', exploration: 'Aventure', mystery: 'Aventure',
+  wrestling: 'Combat', martial: 'Combat', boxing: 'Sport',
+  golf: 'Sport', tennis: 'Sport', soccer: 'Sport', football: 'Sport',
+  baseball: 'Sport', basketball: 'Sport', hockey: 'Sport', skating: 'Sport',
+  fishing: 'Sport', hunting: 'Sport', driving: 'Course', rally: 'Course',
+  helicopter: 'Simulation', aviation: 'Simulation', flight: 'Simulation',
+  naval: 'Simulation', submarine: 'Simulation', trains: 'Simulation',
+  pinball: 'Autre', 'text-based': 'Aventure', 'interactive fiction': 'Aventure'
 };
 
 export default function App() {
@@ -100,6 +120,7 @@ export default function App() {
   const [toasts, setToasts] = useState([]);
   const [lightboxSrc, setLightboxSrc] = useState(null);
   const [pendingRawg, setPendingRawg] = useState(null);
+  const lastRawgId = useRef(null);
 
   useEffect(() => localStorage.setItem(STORAGE_KEY, JSON.stringify(games)), [games]);
   const setApiKey = (k) => { localStorage.setItem(API_KEY, k.trim()); setApiKeyRaw(k.trim()); };
@@ -126,14 +147,16 @@ export default function App() {
     for (const n of names) { const m = PLATFORM_MAP[n.toLowerCase().trim()]; if (m) return m; }
     for (const n of names) { const e = CONSOLES.find(c => c.toLowerCase() === n.toLowerCase()); if (e) return e; }
     for (const n of names) { const p = CONSOLES.find(c => c.toLowerCase().includes(n.toLowerCase()) || n.toLowerCase().includes(c.toLowerCase())); if (p) return p; }
-    return names[0] || '';
+    return '';
   }
 
   function matchGenre(genres) {
     if (!genres || !genres.length) return 'Action';
     for (const g of genres) { const m = GENRE_MAP[g.name?.toLowerCase().trim()]; if (m) return m; }
     for (const g of genres) { const e = Object.values(GENRE_MAP).find(v => v.toLowerCase() === g.name?.toLowerCase()); if (e) return e; }
-    return genres[0]?.name || 'Action';
+    const matched = genres[0]?.name;
+    if (matched && GENRE_OPTIONS.includes(matched)) return matched;
+    return 'Autre';
   }
 
   async function searchRAWG() {
@@ -152,7 +175,7 @@ export default function App() {
   async function selectResult(rawgId) {
     try {
       const r = await fetch(`https://api.rawg.io/api/games/${rawgId}?key=${apiKey}&language=fr`);
-      if (!r.ok) return;
+      if (!r.ok) { toast('Erreur API RAWG', 'error'); return; }
       const g = await r.json();
       const consoleVal = matchConsole(g.platforms);
       const genreVal = matchGenre(g.genres);
@@ -161,41 +184,52 @@ export default function App() {
       const dev = g.developers?.[0]?.name || '';
       const pub = g.publishers?.[0]?.name || '';
 
-      setForm(f => ({ ...f, titre: g.name || f.titre, console: consoleVal, genre: genreVal, annee: g.released ? g.released.split('-')[0] : f.annee, couverture: g.background_image || f.couverture, note, notes: desc, description: desc, developpeur: dev, editeur: pub, rawgId }));
+      setForm(f => ({ ...f, titre: g.name || f.titre, console: consoleVal, genre: genreVal, annee: g.released ? g.released.split('-')[0] : f.annee, couverture: g.background_image || f.couverture, note, description: desc, developpeur: dev, editeur: pub, rawgId }));
       setRawgResults([]);
       setPendingRawg({ description: desc, developpeur: dev, editeur: pub, rawgId, screenshots: [] });
+      lastRawgId.current = rawgId;
 
       toast(`"${g.name}" chargé depuis RAWG`, 'success');
 
       fetch(`https://api.rawg.io/api/games/${rawgId}/screenshots?key=${apiKey}`).then(r => r.ok && r.json()).then(d => {
+        if (lastRawgId.current !== rawgId) return;
         const urls = (d?.results || []).map(s => s.image).filter(Boolean);
         setPendingRawg(p => p ? { ...p, screenshots: urls } : p);
         setForm(f => ({ ...f, screenshots: urls }));
       }).catch(() => {});
 
       fetchWikipedia(g.name, consoleVal).then(wiki => {
+        if (lastRawgId.current !== rawgId) return;
         if (!wiki) return;
-        if (wiki.coverUrl) setForm(f => ({ ...f, couverture: wiki.coverUrl }));
         if (wiki.description && wiki.description.length > 50) {
-          setForm(f => ({ ...f, notes: wiki.description, description: wiki.description }));
+          setForm(f => ({ ...f, description: wiki.description }));
           setPendingRawg(p => p ? { ...p, description: wiki.description } : p);
         }
       });
-    } catch (e) { toast('Erreur chargement', 'error'); }
+    } catch (e) { toast('Erreur chargement RAWG', 'error'); }
   }
 
   async function fetchWikipedia(titre, console) {
-    try {
-      const s = await fetch(`https://fr.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(titre + ' ' + console)}&format=json&origin=*&srlimit=3`);
-      const sd = await s.json();
-      const page = sd.query?.search?.[0];
-      if (!page) return null;
-      const c = await fetch(`https://fr.wikipedia.org/w/api.php?action=query&prop=extracts|pageimages&exintro&explaintext&pithumbsize=400&titles=${encodeURIComponent(page.title)}&format=json&origin=*`);
-      const cd = await c.json();
-      const pg = Object.values(cd.query.pages)[0];
-      if (!pg) return null;
-      return { description: pg.extract || '', coverUrl: pg.thumbnail?.source || null };
-    } catch { return null; }
+    const searchQueries = [
+      `${titre} ${console}`,
+      titre,
+      `${titre} jeu vidéo`
+    ];
+    for (const query of searchQueries) {
+      try {
+        const s = await fetch(`https://fr.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(query)}&format=json&origin=*&srlimit=3`);
+        const sd = await s.json();
+        const page = sd.query?.search?.[0];
+        if (!page) continue;
+        const c = await fetch(`https://fr.wikipedia.org/w/api.php?action=query&prop=extracts|pageimages&exintro&explaintext&pithumbsize=400&titles=${encodeURIComponent(page.title)}&format=json&origin=*`);
+        const cd = await c.json();
+        const pg = Object.values(cd.query.pages)[0];
+        if (!pg) continue;
+        const desc = pg.extract || '';
+        if (desc.length > 30) return { description: desc, coverUrl: pg.thumbnail?.source || null };
+      } catch { continue; }
+    }
+    return null;
   }
 
   async function fetchWikiScreenshots(titre, console) {
@@ -239,7 +273,8 @@ export default function App() {
   function openForm(game) {
     setRawgQuery(''); setRawgResults([]); setRawgError(''); setPendingRawg(null);
     setEditingId(game?.id || '');
-    setForm(game ? { ...{ titre: '', console: '', genre: 'Action', annee: '', couverture: '', note: 0, statut: 'possede', notes: '', description: '', developpeur: '', editeur: '', screenshots: [], rawgId: null }, ...game } : { titre: '', console: '', genre: 'Action', annee: '', couverture: '', note: 0, statut: 'possede', notes: '', description: '', developpeur: '', editeur: '', screenshots: [], rawgId: null });
+    const defaults = { titre: '', console: '', genre: 'Action', annee: '', couverture: '', note: 0, statut: 'possede', notes: '', description: '', developpeur: '', editeur: '', screenshots: [], rawgId: null };
+    setForm(game ? { ...defaults, ...game, notes: game.notes && game.notes !== game.description ? game.notes : '' } : { ...defaults });
     setFormOpen(true);
   }
 
@@ -485,7 +520,7 @@ export default function App() {
             <div className="form-group">
               <span>Genre</span>
               <select className="form-control" value={form.genre} onChange={e => setForm(f => ({ ...f, genre: e.target.value }))}>
-                {['Action', 'Aventure', 'RPG', 'FPS', 'Plateforme', 'Combat', 'Course', 'Sport', 'Simulation', 'Stratégie', 'Puzzle', 'Horreur', 'Party Game', 'Open World', 'Roguelike', 'Metroidvania', 'Hack\'n\'Slash', 'Infiltration', 'Autre'].map(g => <option key={g} value={g}>{g}</option>)}
+                {GENRE_OPTIONS.map(g => <option key={g} value={g}>{g}</option>)}
               </select>
             </div>
           </div>
@@ -517,10 +552,15 @@ export default function App() {
           <div className="form-group">
             <span>URL Couverture</span>
             <input className="form-control" value={form.couverture} onChange={e => setForm(f => ({ ...f, couverture: e.target.value }))} />
+            {form.couverture && <img src={form.couverture} alt="" className="form-cover-preview" onError={e => e.target.style.display = 'none'} />}
+          </div>
+          <div className="form-group">
+            <span>Description</span>
+            <textarea className="form-control" rows={3} value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} style={{ resize: 'vertical' }} placeholder="Description du jeu (auto-remplie via RAWG/Wikipedia)" />
           </div>
           <div className="form-group">
             <span>Notes personnelles</span>
-            <textarea className="form-control" rows={3} value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} style={{ resize: 'vertical' }} />
+            <textarea className="form-control" rows={3} value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} style={{ resize: 'vertical' }} placeholder="Tes notes personnelles..." />
           </div>
           <button className="btn btn-primary btn-full" type="submit">{editingId ? 'Modifier' : 'Ajouter'} le jeu</button>
         </form>
@@ -579,7 +619,7 @@ function DetailView({ game, games, setGames, toast, apiKey, onEdit, onDelete, on
         });
       });
     }
-  }, []);
+  }, [game.rawgId, game.screenshots?.length]);
 
   const coverHtml = game.couverture
     ? <img className="detail-cover" src={game.couverture} alt="" onError={e => e.target.style.display = 'none'} />
@@ -606,7 +646,7 @@ function DetailView({ game, games, setGames, toast, apiKey, onEdit, onDelete, on
         <div className="detail-item"><div className="lbl">Ajouté</div><div className="val">{new Date(game.dateAjout).toLocaleDateString('fr-FR')}</div></div>
       </div>
       {game.description ? <div className="detail-desc"><div className="lbl">Description</div><p>{game.description}</p></div> : null}
-      {game.notes && game.notes !== game.description ? <div className="detail-desc" style={{ marginTop: 8 }}><div className="lbl">Notes perso</div><p>{game.notes}</p></div> : null}
+      {game.notes ? <div className="detail-desc" style={{ marginTop: 8 }}><div className="lbl">Notes perso</div><p>{game.notes}</p></div> : null}
     </div>
     <div className="detail-footer">
       <button className="btn btn-secondary" onClick={onEdit}><Search size={14} /> Modifier</button>
