@@ -3,6 +3,22 @@ import express from 'express';
 const app = express();
 const PORT = 80;
 
+const rateLimit = new Map();
+const RATE_WINDOW_MS = 60_000;
+const RATE_MAX = 10;
+
+function checkRateLimit(ip) {
+  const now = Date.now();
+  const entry = rateLimit.get(ip);
+  if (!entry || now - entry.start > RATE_WINDOW_MS) {
+    rateLimit.set(ip, { start: now, count: 1 });
+    return true;
+  }
+  entry.count++;
+  if (entry.count > RATE_MAX) return false;
+  return true;
+}
+
 app.use(express.static('/app/dist'));
 app.use(express.json());
 
@@ -10,7 +26,27 @@ app.get('/api/ebay/config', (req, res) => {
   res.json({ configured: !!process.env.EBAY_CLIENT_ID });
 });
 
+app.get('/api/rawg/:path(*)', async (req, res) => {
+  try {
+    const key = req.query.key;
+    if (!key) return res.status(400).json({ error: 'Clé API requise' });
+    const path = req.params.path;
+    const qs = Object.entries(req.query)
+      .filter(([k]) => k !== 'key')
+      .map(([k, v]) => `${k}=${encodeURIComponent(v)}`)
+      .join('&');
+    const url = `https://api.rawg.io/api/${path}?key=${key}${qs ? '&' + qs : ''}`;
+    const r = await fetch(url);
+    const data = await r.json();
+    res.status(r.status).json(data);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 app.post('/api/ebay/price', async (req, res) => {
+  const ip = req.ip || req.connection.remoteAddress;
+  if (!checkRateLimit(ip)) return res.status(429).json({ error: 'Trop de requêtes, réessaie dans 1 minute' });
   try {
     const { q, cid, cs } = req.body;
     if (!q) return res.status(400).json({ error: 'Missing q' });

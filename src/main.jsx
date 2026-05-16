@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
-import { Download, Gamepad2, Ghost, KeyRound, Plus, Search, Trash2, X, Upload, Dice5, LayoutGrid, List, ChartPie, ChevronDown, ChevronUp, Maximize2, LogOut, User, Shield, Eye, EyeOff } from 'lucide-react';
+import { Download, DollarSign, Gamepad2, Ghost, KeyRound, Plus, Search, Trash2, X, Upload, Dice5, LayoutGrid, List, ChartPie, ChevronDown, ChevronUp, Maximize2, LogOut, User, Shield, Eye, EyeOff } from 'lucide-react';
 import './styles.css';
 
 const AUTH_USER_KEY = 'insertcoin_user';
@@ -91,7 +91,7 @@ const GENRE_MAP = {
   'turn-based': 'RPG', 'turn-based strategy': 'Stratégie', tactical: 'Stratégie',
   'point-and-click': 'Aventure', visualnovel: 'Aventure', 'visual novel': 'Aventure',
   music: 'Autre', rhythm: 'Autre', trivia: 'Autre', quiz: 'Autre',
-  'battle royale': 'FPS', moba: 'Stratégie', looter: 'RPG', shooter: 'FPS',
+    'battle royale': 'FPS', moba: 'Stratégie', looter: 'RPG',
   dungeon: 'RPG', 'dungeon crawler': 'RPG', crafting: 'Simulation',
   sandbox: 'Simulation', exploration: 'Aventure', mystery: 'Aventure',
   wrestling: 'Combat', martial: 'Combat', boxing: 'Sport',
@@ -144,6 +144,14 @@ export default function App() {
 
   const storageKey = `ludotheque_v2_${user}`;
   useEffect(() => { if (user) localStorage.setItem(storageKey, JSON.stringify(games)); }, [user, storageKey, games]);
+  useEffect(() => {
+    if (user) {
+      const key = `${API_KEY}_${user}`;
+      setApiKeyRaw(localStorage.getItem(key) || '');
+      setEbayCid(localStorage.getItem('ebay_cid') || '');
+      setEbayCs(localStorage.getItem('ebay_cs') || '');
+    }
+  }, [user]);
   const setApiKey = (k) => { localStorage.setItem(apiKeyPref, k.trim()); setApiKeyRaw(k.trim()); };
 
   function logout() {
@@ -212,7 +220,7 @@ export default function App() {
     if (!rawgQuery.trim()) return;
     setRawgLoading(true); setRawgError(''); setRawgResults([]);
     try {
-      const r = await fetch(`https://api.rawg.io/api/games?key=${apiKey}&search=${encodeURIComponent(rawgQuery)}&language=fr&page_size=6`);
+      const r = await fetch(`/api/rawg/games?key=${apiKey}&search=${encodeURIComponent(rawgQuery)}&language=fr&page_size=6`);
       if (!r.ok) throw new Error('Erreur API');
       const d = await r.json();
       setRawgResults(d.results || []);
@@ -222,7 +230,7 @@ export default function App() {
 
   async function selectResult(rawgId) {
     try {
-      const r = await fetch(`https://api.rawg.io/api/games/${rawgId}?key=${apiKey}&language=fr`);
+      const r = await fetch(`/api/rawg/games/${rawgId}?key=${apiKey}&language=fr`);
       if (!r.ok) { toast('Erreur API RAWG', 'error'); return; }
       const g = await r.json();
       const rawgMatches = listConsoleMatches(g.platforms);
@@ -252,7 +260,7 @@ export default function App() {
 
     toast(`"${g.name}" chargé`, 'success');
 
-    fetch(`https://api.rawg.io/api/games/${rawgId}/screenshots?key=${apiKey}`).then(r => r.ok && r.json()).then(d => {
+    fetch(`/api/rawg/games/${rawgId}/screenshots?key=${apiKey}`).then(r => r.ok && r.json()).then(d => {
       if (lastRawgId.current !== rawgId) return;
       const urls = (d?.results || []).map(s => s.image).filter(Boolean);
       setForm(f => ({ ...f, screenshots: urls }));
@@ -330,9 +338,9 @@ export default function App() {
     return null;
   }
 
-  async function fetchWikiScreenshots(titre, console) {
+  const fetchWikiScreenshots = useCallback(async function(titre, consoleVal) {
     try {
-      const s = await fetch(`https://fr.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(titre + ' ' + console)}&format=json&origin=*&srlimit=3`);
+      const s = await fetch(`https://fr.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(titre + ' ' + consoleVal)}&format=json&origin=*&srlimit=3`);
       const sd = await s.json();
       const page = sd.query?.search?.[0];
       if (!page) return [];
@@ -350,7 +358,7 @@ export default function App() {
       }
       return urls;
     } catch { return []; }
-  }
+  }, []);
 
   function saveGame(e) {
     e.preventDefault();
@@ -390,7 +398,7 @@ export default function App() {
     const game = games.find(g => g.id === detailGame.id) || detailGame;
     setDetailGame(game);
     if (!game.screenshots?.length && game.rawgId && apiKey) {
-      fetch(`https://api.rawg.io/api/games/${game.rawgId}/screenshots?key=${apiKey}`).then(r => r.ok && r.json()).then(d => {
+      fetch(`/api/rawg/games/${game.rawgId}/screenshots?key=${apiKey}`).then(r => r.ok && r.json()).then(d => {
         const urls = (d?.results || []).map(s => s.image).filter(Boolean);
         if (urls.length) { updateGameField(game.id, 'screenshots', urls); setDetailGame(g => ({ ...g, screenshots: urls })); }
       }).catch(() => {
@@ -752,7 +760,7 @@ function DetailView({ game, games, setGames, toast, apiKey, onEdit, onDelete, on
 
   useEffect(() => {
     if (!game.screenshots?.length && game.rawgId && apiKey) {
-      fetch(`https://api.rawg.io/api/games/${game.rawgId}/screenshots?key=${apiKey}`).then(r => r.ok && r.json()).then(d => {
+      fetch(`/api/rawg/games/${game.rawgId}/screenshots?key=${apiKey}`).then(r => r.ok && r.json()).then(d => {
         const urls = (d?.results || []).map(s => s.image).filter(Boolean);
         if (urls.length) { setScreenshots(urls); setGames(g => g.map(x => x.id === game.id ? { ...x, screenshots: urls } : x)); }
       }).catch(() => {
@@ -761,7 +769,7 @@ function DetailView({ game, games, setGames, toast, apiKey, onEdit, onDelete, on
         });
       });
     }
-  }, [game.rawgId, game.screenshots?.length]);
+  }, [game.id, game.rawgId, game.screenshots?.length, apiKey, game.titre, game.console, fetchWikiScreenshots, setGames]);
 
   async function fetchEbayPrice() {
     setEbayLoading(true);
@@ -808,7 +816,7 @@ function DetailView({ game, games, setGames, toast, apiKey, onEdit, onDelete, on
       {game.description ? <div className="detail-desc"><div className="lbl">Description</div><p>{game.description}</p></div> : null}
       {game.notes ? <div className="detail-desc" style={{ marginTop: 8 }}><div className="lbl">Notes perso</div><p>{game.notes}</p></div> : null}
       <div className="detail-ebay">
-        <button className="btn btn-sm" onClick={fetchEbayPrice} disabled={ebayLoading}>{ebayLoading ? <span className="btn-spinner" /> : '💰'} Prix eBay
+        <button className="btn btn-sm" onClick={fetchEbayPrice} disabled={ebayLoading}>{ebayLoading ? <span className="btn-spinner" /> : <DollarSign size={14} />} Prix eBay
         </button>
         {ebayError && <p className="ebay-error">{ebayError}</p>}
         {ebayPrice && <div className="ebay-results">
@@ -844,28 +852,41 @@ function Modal({ open, onClose, title, children }) {
   );
 }
 
+async function sha256(text) {
+  const buf = new TextEncoder().encode(text);
+  const hash = await crypto.subtle.digest('SHA-256', buf);
+  return Array.from(new Uint8Array(hash)).map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
 function AuthScreen({ onLogin }) {
   const [mode, setMode] = useState('login');
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [showPw, setShowPw] = useState(false);
+  const [loading, setLoading] = useState(false);
 
-  function handleSubmit(e) {
+  async function handleSubmit(e) {
     e.preventDefault();
     setError('');
     if (!username.trim() || !password.trim()) { setError('Tous les champs sont requis'); return; }
-    const users = JSON.parse(localStorage.getItem(AUTH_USERS_KEY) || '{}');
-    if (mode === 'login') {
-      if (!users[username]) { setError('Utilisateur inconnu'); return; }
-      if (users[username] !== password) { setError('Mot de passe incorrect'); return; }
-      onLogin(username);
-    } else {
-      if (users[username]) { setError('Ce nom existe déjà'); return; }
-      if (password.length < 3) { setError('Mot de passe trop court (min 3)'); return; }
-      users[username] = password;
-      localStorage.setItem(AUTH_USERS_KEY, JSON.stringify(users));
-      onLogin(username);
+    setLoading(true);
+    try {
+      const hash = await sha256(password);
+      const users = JSON.parse(localStorage.getItem(AUTH_USERS_KEY) || '{}');
+      if (mode === 'login') {
+        if (!users[username]) { setError('Utilisateur inconnu'); return; }
+        if (users[username] !== hash) { setError('Mot de passe incorrect'); return; }
+        onLogin(username);
+      } else {
+        if (users[username]) { setError('Ce nom existe déjà'); return; }
+        if (password.length < 3) { setError('Mot de passe trop court (min 3)'); return; }
+        users[username] = hash;
+        localStorage.setItem(AUTH_USERS_KEY, JSON.stringify(users));
+        onLogin(username);
+      }
+    } finally {
+      setLoading(false);
     }
   }
 
@@ -886,7 +907,7 @@ function AuthScreen({ onLogin }) {
             <button type="button" className="pw-toggle" onClick={() => setShowPw(!showPw)}>{showPw ? <EyeOff size={16} /> : <Eye size={16} />}</button>
           </div>
           {error && <p className="form-error">{error}</p>}
-          <button className="btn btn-primary btn-full" type="submit">{mode === 'login' ? 'Connexion' : 'Créer mon compte'}</button>
+          <button className="btn btn-primary btn-full" type="submit" disabled={loading}>{loading ? <span className="btn-spinner" /> : (mode === 'login' ? 'Connexion' : 'Créer mon compte')}</button>
         </form>
         <p className="auth-switch">
           {mode === 'login' ? <>Pas encore de compte ? <button className="link-btn" onClick={() => { setMode('register'); setError(''); }}>Créer un compte</button></>
