@@ -34,7 +34,7 @@ const CONSOLE_FAMILIES = {
   Autre: ['Commodore 64', 'Commodore Amiga', 'MSX', 'MSX2', 'ColecoVision', 'Intellivision', 'Philips CD-i', '3DO']
 };
 
-const FAMILY_COLORS = { Nintendo: '#E60012', PlayStation: '#003791', Xbox: '#107C10', Sega: '#1A1A1A', SNK: '#D4AF37', NEC: '#7B3FA0', Atari: '#BF3A2B', PC: '#00AEEF', Autre: '#6B3FA0' };
+const FAMILY_COLORS = { Nintendo: '#E60012', PlayStation: '#003791', Xbox: '#107C10', Sega: '#0072b2', SNK: '#D4AF37', NEC: '#8B5CF6', Atari: '#E05A47', PC: '#00d2ff', Autre: '#8a3ffc' };
 const STATUTS = { possede: 'Possédé', fini: 'Fini', en_cours: 'En cours' };
 
 const PLATFORM_MAP = {
@@ -91,7 +91,7 @@ const GENRE_MAP = {
   'turn-based': 'RPG', 'turn-based strategy': 'Stratégie', tactical: 'Stratégie',
   'point-and-click': 'Aventure', visualnovel: 'Aventure', 'visual novel': 'Aventure',
   music: 'Autre', rhythm: 'Autre', trivia: 'Autre', quiz: 'Autre',
-    'battle royale': 'FPS', moba: 'Stratégie', looter: 'RPG',
+  'battle royale': 'FPS', moba: 'Stratégie', looter: 'RPG',
   dungeon: 'RPG', 'dungeon crawler': 'RPG', crafting: 'Simulation',
   sandbox: 'Simulation', exploration: 'Aventure', mystery: 'Aventure',
   wrestling: 'Combat', martial: 'Combat', boxing: 'Sport',
@@ -103,12 +103,102 @@ const GENRE_MAP = {
   pinball: 'Autre', 'text-based': 'Aventure', 'interactive fiction': 'Aventure'
 };
 
+/* 8-bit Synthesizer via Web Audio API */
+const playSound = (type) => {
+  try {
+    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    
+    osc.connect(gain);
+    gain.connect(audioCtx.destination);
+    
+    if (type === 'coin') {
+      const now = audioCtx.currentTime;
+      osc.type = 'square';
+      osc.frequency.setValueAtTime(987.77, now); // B5
+      gain.gain.setValueAtTime(0.08, now);
+      osc.frequency.setValueAtTime(1318.51, now + 0.08); // E6
+      gain.gain.setValueAtTime(0.08, now + 0.08);
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.4);
+      osc.start(now);
+      osc.stop(now + 0.4);
+    } else if (type === 'click') {
+      const now = audioCtx.currentTime;
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(800, now);
+      gain.gain.setValueAtTime(0.02, now);
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.05);
+      osc.start(now);
+      osc.stop(now + 0.05);
+    } else if (type === 'delete') {
+      const now = audioCtx.currentTime;
+      osc.type = 'sawtooth';
+      osc.frequency.setValueAtTime(220, now);
+      osc.frequency.exponentialRampToValueAtTime(60, now + 0.3);
+      gain.gain.setValueAtTime(0.08, now);
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.3);
+      osc.start(now);
+      osc.stop(now + 0.3);
+    } else if (type === 'success') {
+      const now = audioCtx.currentTime;
+      osc.type = 'triangle';
+      const notes = [523.25, 659.25, 783.99, 1046.50]; // C5, E5, G5, C6
+      gain.gain.setValueAtTime(0.04, now);
+      notes.forEach((freq, idx) => {
+        osc.frequency.setValueAtTime(freq, now + idx * 0.07);
+      });
+      gain.gain.setValueAtTime(0.04, now + 0.21);
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.45);
+      osc.start(now);
+      osc.stop(now + 0.45);
+    }
+  } catch (e) {
+    // Fail silently if AudioContext is blocked or unsupported
+  }
+};
+
 function genId() {
   if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID();
   return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
     const r = Math.random() * 16 | 0;
     return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
   });
+}
+
+function getConsoleFamily(consoleName) {
+  if (!consoleName) return 'Autre';
+  for (const [family, list] of Object.entries(CONSOLE_FAMILIES)) {
+    if (list.includes(consoleName)) return family;
+  }
+  return 'Autre';
+}
+
+function getConsoleThemeClass(consoleName) {
+  const family = getConsoleFamily(consoleName);
+  return `${family.toLowerCase()}-theme`;
+}
+
+function handleCardMouseMove(e) {
+  const card = e.currentTarget;
+  const rect = card.getBoundingClientRect();
+  const x = e.clientX - rect.left;
+  const y = e.clientY - rect.top;
+  const px = (x / rect.width) - 0.5;
+  const py = (y / rect.height) - 0.5;
+  
+  card.style.setProperty('--tilt-x', `${-py * 16}deg`);
+  card.style.setProperty('--tilt-y', `${px * 16}deg`);
+  card.style.setProperty('--mouse-x', `${(x / rect.width) * 100}%`);
+  card.style.setProperty('--mouse-y', `${(y / rect.height) * 100}%`);
+}
+
+function handleCardMouseLeave(e) {
+  const card = e.currentTarget;
+  card.style.setProperty('--tilt-x', '0deg');
+  card.style.setProperty('--tilt-y', '0deg');
+  card.style.setProperty('--mouse-x', '50%');
+  card.style.setProperty('--mouse-y', '50%');
 }
 
 export default function App() {
@@ -134,12 +224,12 @@ export default function App() {
   const [rawgResults, setRawgResults] = useState([]);
   const [rawgLoading, setRawgLoading] = useState(false);
   const [rawgError, setRawgError] = useState('');
-  const [statsOpen, setStatsOpen] = useState(false);
   const [toasts, setToasts] = useState([]);
   const [lightboxSrc, setLightboxSrc] = useState(null);
   const [platformPicker, setPlatformPicker] = useState({ open: false, platforms: [], data: null, wiki: null });
   const [ebayCid, setEbayCid] = useState(() => localStorage.getItem('ebay_cid') || '');
   const [ebayCs, setEbayCs] = useState(() => localStorage.getItem('ebay_cs') || '');
+  const [coinActive, setCoinActive] = useState(false);
   const lastRawgId = useRef(null);
 
   const storageKey = `ludotheque_v2_${user}`;
@@ -152,14 +242,17 @@ export default function App() {
       setEbayCs(localStorage.getItem('ebay_cs') || '');
     }
   }, [user]);
+  
   const setApiKey = (k) => { localStorage.setItem(apiKeyPref, k.trim()); setApiKeyRaw(k.trim()); };
 
   function logout() {
+    playSound('delete');
     localStorage.removeItem(AUTH_USER_KEY);
     setUser('');
   }
 
   function login(username) {
+    playSound('success');
     localStorage.setItem(AUTH_USER_KEY, username);
     setUser(username);
   }
@@ -169,6 +262,12 @@ export default function App() {
     setToasts(t => [...t, { id, msg, type }]);
     setTimeout(() => setToasts(t => t.filter(x => x.id !== id)), 3000);
   }, []);
+
+  const handleCoinInsert = () => {
+    playSound('coin');
+    setCoinActive(true);
+    setTimeout(() => setCoinActive(false), 400);
+  };
 
   const filteredGames = useMemo(() => {
     return games.filter(g => {
@@ -259,6 +358,7 @@ export default function App() {
     lastRawgId.current = rawgId;
 
     toast(`"${g.name}" chargé`, 'success');
+    playSound('success');
 
     fetch(`/api/rawg/games/${rawgId}/screenshots?key=${apiKey}`).then(r => r.ok && r.json()).then(d => {
       if (lastRawgId.current !== rawgId) return;
@@ -374,9 +474,13 @@ export default function App() {
     setGames(g => editingId ? g.map(x => x.id === editingId ? game : x) : [game, ...g]);
     setFormOpen(false);
     toast(editingId ? `"${game.titre}" modifié` : `"${game.titre}" ajouté !`, 'success');
+    
+    // Fire arcade micro-animation and synth
+    handleCoinInsert();
   }
 
   function openForm(game) {
+    playSound('click');
     setRawgQuery(''); setRawgResults([]); setRawgError('');
     setEditingId(game?.id || '');
     const defaults = { titre: '', console: '', genre: 'Action', annee: '', couverture: '', note: 0, statut: 'possede', notes: '', description: '', developpeur: '', editeur: '', screenshots: [], rawgId: null, prix: '' };
@@ -386,12 +490,17 @@ export default function App() {
 
   function deleteGame(id) {
     if (!confirm('Supprimer ce jeu ?')) return;
+    playSound('delete');
     setGames(g => g.filter(x => x.id !== id));
     setDetailOpen(false);
     toast('Jeu supprimé', 'error');
   }
 
-  function openDetail(game) { setDetailGame(game); setDetailOpen(true); }
+  function openDetail(game) {
+    playSound('click');
+    setDetailGame(game);
+    setDetailOpen(true);
+  }
 
   function showDetailFromList() {
     if (!detailGame) return;
@@ -414,12 +523,14 @@ export default function App() {
   function pickRandom() {
     const list = filteredGames.length ? filteredGames : games;
     if (!list.length) { toast('Aucun jeu disponible', 'error'); return; }
+    playSound('coin');
     const g = list[Math.floor(Math.random() * list.length)];
     toast(`🎲 ${g.titre}`, 'success');
     setTimeout(() => openDetail(g), 600);
   }
 
   function exportData() {
+    playSound('success');
     const a = document.createElement('a');
     a.href = URL.createObjectURL(new Blob([JSON.stringify(games, null, 2)], { type: 'application/json' }));
     a.download = `ludotheque_${new Date().toISOString().slice(0, 10)}.json`;
@@ -428,6 +539,7 @@ export default function App() {
   }
 
   function importData() {
+    playSound('click');
     const inp = document.createElement('input');
     inp.type = 'file';
     inp.accept = '.json';
@@ -440,6 +552,7 @@ export default function App() {
           const data = JSON.parse(ev.target.result);
           if (!Array.isArray(data)) throw new Error('Format invalide');
           if (!confirm(`Importer ${data.length} jeu(x) ? Remplace la collection.`)) return;
+          playSound('success');
           setGames(data);
           toast(`${data.length} jeu(x) importé(s)`, 'success');
         } catch (err) { toast('Fichier invalide', 'error'); }
@@ -461,6 +574,13 @@ export default function App() {
   const finished = games.filter(g => g.statut === 'fini').length;
   const platforms = new Set(games.map(g => g.console).filter(Boolean)).size;
 
+  const totalValue = useMemo(() => {
+    return games.reduce((acc, g) => {
+      const val = parseFloat(g.prix);
+      return isNaN(val) ? acc : acc + val;
+    }, 0);
+  }, [games]);
+
   const stats = useMemo(() => {
     const byFamily = {}; const byDecade = {}; let fin = 0, rated = 0, totalR = 0;
     games.forEach(g => {
@@ -475,218 +595,315 @@ export default function App() {
   if (!user) return <AuthScreen onLogin={login} />;
 
   return (
-    <>
-      {/* Header */}
-      <header className="header">
-        <div className="bento brand" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-            <div className="brand-icon"><Gamepad2 size={24} /></div>
-            <div><h1>InsertCoin</h1><p>Gère ta collection retrogaming</p></div>
-          </div>
-          <button className="user-badge" onClick={logout} title="Se déconnecter">
-            <User size={14} /><span>{user}</span><LogOut size={12} />
-          </button>
-        </div>
-        <div className="bento stats" style={{ padding: '1rem' }}>
-          <div className="stat"><span className="stat-val">{games.length}</span><span className="stat-lbl">Jeux</span></div>
-          <div className="stat"><span className="stat-val">{finished}</span><span className="stat-lbl">Fini</span></div>
-          <div className="stat"><span className="stat-val">{platforms}</span><span className="stat-lbl">Consoles</span></div>
-          <div className="stat"><span className="stat-val">{stats.avg}</span><span className="stat-lbl">Note moy.</span></div>
-        </div>
-      </header>
-
-      {/* Controls */}
-      <section className="controls">
-        <label className="search-box">
-          <Search size={17} />
-          <input value={query} onChange={e => setQuery(e.target.value)} placeholder="Rechercher..." />
-        </label>
-        <div className="view-toggle">
-          <button className={view === 'grid' ? 'active' : ''} onClick={() => setView('grid')}><LayoutGrid size={16} /></button>
-          <button className={view === 'list' ? 'active' : ''} onClick={() => setView('list')}><List size={16} /></button>
-        </div>
-        <button className="btn btn-secondary" onClick={pickRandom}><Dice5 size={16} /> Aléatoire</button>
-        <button className="btn btn-secondary" onClick={exportData}><Download size={16} /></button>
-        <button className="btn btn-secondary" onClick={importData}><Upload size={16} /></button>
-        <button className="btn btn-secondary" onClick={() => setApiOpen(true)}><KeyRound size={16} /></button>
-      </section>
-
-      {/* Filters */}
-      <section className="filters">
-        <button className="stats-toggle" onClick={() => setStatsOpen(!statsOpen)}>
-          <span><ChartPie size={16} style={{ marginRight: 6 }} />Statistiques</span>
-          {statsOpen ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-        </button>
-        <div className={`stats-panel ${statsOpen ? 'open' : ''}`}>
-          <div className="stats-grid">
-            <div className="stat-card"><span className="val">{games.length}</span><span className="lbl">Total</span></div>
-            <div className="stat-card"><span className="val">{stats.fin}</span><span className="lbl">Finis</span></div>
-            <div className="stat-card"><span className="val">{games.length - stats.fin}</span><span className="lbl">Restants</span></div>
-            <div className="stat-card"><span className="val">{stats.avg}</span><span className="lbl">Note</span></div>
-            {Object.entries(stats.byDecade).sort((a, b) => a[0] - b[0]).map(([d, c]) => (
-              <div className="stat-card" key={d}><span className="val">{c}</span><span className="lbl">{d}s</span></div>
-            ))}
+    <div className="app-layout">
+      {/* Sidebar fixed (Control Center) */}
+      <aside className="app-sidebar">
+        <div className="brand-section">
+          <div className="brand-container">
+            <div className="brand-icon-box"><Gamepad2 size={22} style={{ color: 'var(--accent-cyan)' }} /></div>
+            <div>
+              <h1 className="brand-title">InsertCoin</h1>
+              <div className="brand-subtitle">Retrogaming Collection</div>
+            </div>
           </div>
         </div>
 
-        {hasGames && <div className="family-chips">
-          <button className={`family-chip ${filter.family === 'all' ? 'active' : ''}`} onClick={() => setFilter({ family: 'all', console: 'all', decade: filter.decade })} style={{ background: '#2a2a3a' }}>Tous</button>
-          {Object.keys(CONSOLE_FAMILIES).map(f => (
-            <button key={f} className={`family-chip ${filter.family === f ? 'active' : ''}`} onClick={() => setFilter({ family: f, console: 'all', decade: filter.decade })} style={{ background: FAMILY_COLORS[f] }}>{f}</button>
-          ))}
-        </div>}
+        {/* Arcade Interactive Coin Slot */}
+        <div className="coin-slot-wrapper" onClick={handleCoinInsert}>
+          <div className="coin-slot-label">Insert Coin</div>
+          <div className={`coin-slot ${coinActive ? 'coin-inserted' : ''}`} title="Glisser une pièce de collection" />
+        </div>
 
-        {hasGames && <div className="decade-chips">
-          <button className={`decade-chip ${filter.decade === 'all' ? 'active' : ''}`} onClick={() => setFilterVal('decade', 'all')}>Tout</button>
-          {[1970, 1980, 1990, 2000, 2010, 2020].map(d => (
-            <button key={d} className={`decade-chip ${filter.decade === String(d) ? 'active' : ''}`} onClick={() => setFilterVal('decade', String(d))}>{d}s</button>
-          ))}
-        </div>}
-
-        {hasGames && <div className="console-chips">
-          {allConsoles.map(c => (
-            <button key={c} className={`chip ${filter.console === c ? 'active' : ''}`} onClick={() => filterGamesByConsole(c)}>{c === 'all' ? 'Toutes' : c}</button>
-          ))}
-        </div>}
-      </section>
-
-      {/* Game Grid / List */}
-      <main className="main">
-        {!hasGames ? (
-          <div className="empty-state fade-in">
-            <Ghost size={48} />
-            <h2>Ta collection est vide</h2>
-            <p>Ajoute tes premiers jeux en cliquant sur <strong>+</strong></p>
+        {/* User Card */}
+        <div className="user-control">
+          <div className="user-card">
+            <div className="user-info">
+              <div className="user-avatar">{user.slice(0, 2).toUpperCase()}</div>
+              <div className="user-name" title={user}>{user}</div>
+            </div>
+            <button className="logout-btn" onClick={logout} title="Se déconnecter"><LogOut size={15} /></button>
           </div>
-        ) : !filteredGames.length ? (
-          <div className="empty-state fade-in">
-            <Search size={48} />
-            <h2>Aucun résultat</h2>
-            <p>Essaie de modifier tes filtres</p>
+        </div>
+
+        {/* Collection stats summary */}
+        <div className="sidebar-stats-title">Collection</div>
+        <div className="sidebar-stats-grid">
+          <div className="mini-stat-card">
+            <span className="mini-stat-val highlight">{games.length}</span>
+            <span className="mini-stat-lbl">Jeux</span>
           </div>
-        ) : view === 'list' ? (
-          <div className="games-list">
-            {filteredGames.map(g => (
-              <div key={g.id} className="game-list-item" onClick={() => openDetail(g)}>
-                {g.couverture ? <img className="list-cover" src={g.couverture} alt="" onError={e => e.target.style.display = 'none'} /> : <div className="list-cover" />}
-                <div>
-                  <div className="list-title">{g.titre}</div>
-                  <div className="list-meta">{g.annee || '?'} · {g.genre || '—'}</div>
-                </div>
-                <span className="list-console">{g.console}</span>
-                <div className="list-stars">{'★'.repeat(g.note || 0)}{'☆'.repeat(5 - (g.note || 0))}</div>
+          <div className="mini-stat-card">
+            <span className="mini-stat-val">{finished}</span>
+            <span className="mini-stat-lbl">Finis</span>
+          </div>
+          <div className="mini-stat-card">
+            <span className="mini-stat-val">{platforms}</span>
+            <span className="mini-stat-lbl">Consoles</span>
+          </div>
+          <div className="mini-stat-card">
+            <span className="mini-stat-val" title={`${totalValue.toFixed(2)} €`}>
+              {totalValue > 0 ? `${Math.round(totalValue)} €` : stats.avg}
+            </span>
+            <span className="mini-stat-lbl">{totalValue > 0 ? 'Valeur' : 'Note Moy.'}</span>
+          </div>
+        </div>
+
+        {/* Tools Actions Menu */}
+        <div className="sidebar-nav">
+          <button className="nav-item-btn" onClick={pickRandom}><Dice5 size={16} /> Jeu Aléatoire</button>
+          <button className="nav-item-btn" onClick={() => { setApiOpen(true); playSound('click'); }}><KeyRound size={16} /> Clés API & Config</button>
+          <button className="nav-item-btn" onClick={exportData}><Download size={16} /> Exporter Collection</button>
+          <button className="nav-item-btn" onClick={importData}><Upload size={16} /> Importer Collection</button>
+        </div>
+      </aside>
+
+      {/* Main workspace container */}
+      <main className="app-content">
+        {/* Retro CRT Info Banner Widget */}
+        <section className="crt-widget">
+          <div className="crt-stats-layout">
+            <div className="crt-welcome-msg">
+              <h2>SALUT, COLLECTIONNEUR.</h2>
+              <p>&gt; SYSTEM LOADED. RETRO ENGINE READY.</p>
+            </div>
+            <div className="crt-numbers">
+              <div className="crt-stat-item">
+                <span className="crt-stat-val">{filteredGames.length}</span>
+                <span className="crt-stat-lbl">Résultats</span>
               </div>
-            ))}
-          </div>
-        ) : (
-          <div className="games-grid">
-            {filteredGames.map(g => (
-              <div key={g.id} className="game-card" onClick={() => openDetail(g)}>
-                <button className="delete-btn" onClick={e => { e.stopPropagation(); deleteGame(g.id); }}><Trash2 size={14} /></button>
-                <span className={`badge badge-${g.statut}`}>{STATUTS[g.statut] || g.statut}</span>
-                {g.couverture ? <img className="game-cover" src={g.couverture} alt="" loading="lazy" onError={e => e.target.style.display = 'none'} /> : <div className="game-cover fallback-cover" />}
-                <div className="game-overlay">
-                  <h3 className="game-title">{g.titre}</h3>
-                  <div className="game-meta"><span>{g.console}</span><span>{g.annee}</span></div>
-                </div>
+              <div className="crt-stat-item">
+                <span className="crt-stat-val">{stats.avg}</span>
+                <span className="crt-stat-lbl">Note moyenne</span>
               </div>
-            ))}
+            </div>
           </div>
-        )}
+        </section>
+
+        {/* Content toolbar */}
+        <section className="content-toolbar">
+          <label className="toolbar-search">
+            <Search size={18} />
+            <input value={query} onChange={e => { setQuery(e.target.value); playSound('click'); }} placeholder="Rechercher par titre, console, genre..." />
+          </label>
+          
+          <div className="toolbar-actions">
+            <div className="view-selector">
+              <button className={`view-select-btn ${view === 'grid' ? 'active' : ''}`} onClick={() => { setView('grid'); playSound('click'); }} title="Grille Holographique"><LayoutGrid size={16} /></button>
+              <button className={`view-select-btn ${view === 'list' ? 'active' : ''}`} onClick={() => { setView('list'); playSound('click'); }} title="Tableau des Scores"><List size={16} /></button>
+            </div>
+            <button className="btn-premium btn-premium-primary" onClick={() => openForm()}><Plus size={16} /> Ajouter un jeu</button>
+          </div>
+        </section>
+
+        {/* Advanced filters category tabs */}
+        <section className="category-filters">
+          {hasGames && (
+            <div className="family-tabs">
+              <button className={`family-tab ${filter.family === 'all' ? 'active' : ''}`} onClick={() => { setFilter({ family: 'all', console: 'all', decade: filter.decade }); playSound('click'); }} style={{ '--console-color': 'var(--primary)' }}>Tous</button>
+              {Object.keys(CONSOLE_FAMILIES).map(f => (
+                <button key={f} className={`family-tab ${filter.family === f ? 'active' : ''}`} onClick={() => { setFilter({ family: f, console: 'all', decade: filter.decade }); playSound('click'); }} style={{ '--console-color': FAMILY_COLORS[f], '--console-bg': FAMILY_COLORS[f] + '1a' }}>{f}</button>
+              ))}
+            </div>
+          )}
+
+          {hasGames && (
+            <div className="sub-filter-row">
+              <div className="console-chips">
+                {allConsoles.map(c => (
+                  <button key={c} className={`console-chip ${filter.console === c ? 'active' : ''}`} onClick={() => { filterGamesByConsole(c); playSound('click'); }}>{c === 'all' ? 'Toutes consoles' : c}</button>
+                ))}
+              </div>
+              <div className="decade-chips">
+                <button className={`decade-chip ${filter.decade === 'all' ? 'active' : ''}`} onClick={() => { setFilterVal('decade', 'all'); playSound('click'); }}>Toutes époques</button>
+                {[1970, 1980, 1990, 2000, 2010, 2020].map(d => (
+                  <button key={d} className={`decade-chip ${filter.decade === String(d) ? 'active' : ''}`} onClick={() => { setFilterVal('decade', String(d)); playSound('click'); }}>{d}s</button>
+                ))}
+              </div>
+            </div>
+          )}
+        </section>
+
+        {/* Dynamic Games Catalog Area */}
+        <section className="game-shelf-container">
+          {!hasGames ? (
+            <div className="empty-state fade-in">
+              <Ghost size={48} />
+              <h2>Ta collection est vide</h2>
+              <p>Insère une pièce virtuelle pour ajouter tes premiers jeux vidéo !</p>
+            </div>
+          ) : !filteredGames.length ? (
+            <div className="empty-state fade-in">
+              <Search size={48} />
+              <h2>Aucun résultat</h2>
+              <p>Essaie de modifier tes filtres ou tes recherches.</p>
+            </div>
+          ) : view === 'list' ? (
+            <div className="games-list-table">
+              {filteredGames.map(g => {
+                const family = getConsoleFamily(g.console);
+                const consoleColor = FAMILY_COLORS[family] || '#8a3ffc';
+                return (
+                  <div key={g.id} className="list-row-item" onClick={() => openDetail(g)}>
+                    {g.couverture ? <img className="list-row-cover" src={g.couverture} alt="" onError={e => e.target.style.display = 'none'} /> : <div className="list-row-cover" style={{ background: 'var(--surface-hover)' }} />}
+                    <div className="list-row-title-box">
+                      <span className="list-row-title">{g.titre}</span>
+                      <span className="list-row-genre">{g.genre || '—'}</span>
+                    </div>
+                    <span className="list-row-console" style={{ '--console-color': consoleColor }}>{g.console}</span>
+                    <span className="list-row-stars">{'★'.repeat(g.note || 0)}{'☆'.repeat(5 - (g.note || 0))}</span>
+                    <span className="list-row-price">{g.prix ? `${parseFloat(g.prix).toFixed(2).replace('.', ',')} €` : '—'}</span>
+                    <span className={`list-row-badge badge-${g.statut}`}>{STATUTS[g.statut] || g.statut}</span>
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="games-shelf-grid">
+              {filteredGames.map(g => {
+                const family = getConsoleFamily(g.console);
+                const consoleColor = FAMILY_COLORS[family] || '#8a3ffc';
+                const themeClass = getConsoleThemeClass(g.console);
+                
+                // Formulate retro grading label
+                const gradeLabel = g.statut === 'fini' ? '9.8 / A++' : g.statut === 'en_cours' ? '8.5 / B+' : '9.0 / A';
+                
+                return (
+                  <div key={g.id} className="game-card-wrapper">
+                    <div className={`game-card ${themeClass}`} style={{ '--console-color': consoleColor }} onClick={() => openDetail(g)} onMouseMove={handleCardMouseMove} onMouseLeave={handleCardMouseLeave}>
+                      {/* Left Cartridge Spine border indicator */}
+                      <div className="card-spine-badge" />
+                      
+                      {/* Grading protection sticker case */}
+                      <div className="grading-sticker">
+                        <span className="grading-sticker-top">Graded</span>
+                        <span className={`grading-sticker-grade grading-stick-${g.statut}`}>{gradeLabel}</span>
+                      </div>
+                      
+                      {/* Quick delete & edit buttons on hover */}
+                      <div className="card-quick-actions">
+                        <button className="card-action-btn delete" onClick={e => { e.stopPropagation(); deleteGame(g.id); }}><Trash2 size={13} /></button>
+                      </div>
+                      
+                      {/* Cover box artwork */}
+                      <div className="card-cover-container">
+                        {g.couverture ? (
+                          <img className="card-cover-img" src={g.couverture} alt="" loading="lazy" onError={e => e.target.style.display = 'none'} />
+                        ) : (
+                          <div className="card-cover-fallback">
+                            <Gamepad2 size={36} />
+                          </div>
+                        )}
+                      </div>
+                      
+                      {/* Bottom Info overlay */}
+                      <div className="card-info-overlay">
+                        <h3 className="card-title">{g.titre}</h3>
+                        <div className="card-metadata">
+                          <span className="card-console-tag">{g.console}</span>
+                          <span>{g.annee ? g.annee.slice(0, 4) : '—'}</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </section>
       </main>
 
-      {/* FAB */}
-      <button className="fab" onClick={() => openForm()}><Plus size={26} /></button>
+      {/* FAB button */}
+      <button className="fab-premium" onClick={() => openForm()}><Plus size={26} /></button>
 
       {/* Form Modal */}
       <Modal open={formOpen} onClose={() => setFormOpen(false)} title={editingId ? 'Modifier le jeu' : 'Ajouter un jeu'}>
         <div className="rawg-row">
-          <input className="form-control" value={rawgQuery} onChange={e => setRawgQuery(e.target.value)}
+          <input className="input-premium" value={rawgQuery} onChange={e => setRawgQuery(e.target.value)}
             onKeyDown={e => e.key === 'Enter' && searchRAWG()} placeholder="Rechercher sur RAWG..." />
-          <button className="btn btn-primary" onClick={searchRAWG}><Search size={16} /></button>
+          <button className="btn-premium btn-premium-primary" onClick={searchRAWG}><Search size={16} /></button>
         </div>
-        {rawgLoading && <p style={{ color: 'var(--text2)', fontSize: 'var(--font-sm)', marginBottom: '0.5rem' }}>Recherche...</p>}
+        {rawgLoading && <p style={{ color: 'var(--text-muted)', fontSize: '0.8rem', margin: '0.5rem 0' }}>Recherche...</p>}
         {rawgError && <p className="form-error">{rawgError}</p>}
         {rawgResults.length > 0 && <div className="rawg-results">
           {rawgResults.map(r => (
             <button key={r.id} className="rawg-result" onClick={() => selectResult(r.id)}>
               {r.background_image && <img src={r.background_image} alt="" />}
-              <span>{r.name} <span style={{ color: 'var(--text3)' }}>({r.released ? r.released.split('-')[0] : '?'})</span></span>
+              <span>{r.name} <span style={{ color: 'var(--text-dark)' }}>({r.released ? r.released.split('-')[0] : '?'})</span></span>
             </button>
           ))}
         </div>}
 
         <form onSubmit={saveGame}>
           <input type="hidden" value={form.rawgId || ''} readOnly />
-          <div className="form-group">
+          <div className="form-group-premium">
             <span>Titre</span>
-            <input className="form-control" required value={form.titre} onChange={e => setForm(f => ({ ...f, titre: e.target.value }))} />
+            <input className="input-premium" required value={form.titre} onChange={e => setForm(f => ({ ...f, titre: e.target.value }))} />
           </div>
-          <div className="form-grid">
-            <div className="form-group">
+          <div className="form-grid-premium">
+            <div className="form-group-premium">
               <span>Console</span>
-              <select className="form-control" value={form.console} onChange={e => setForm(f => ({ ...f, console: e.target.value }))}>
+              <select className="input-premium" value={form.console} onChange={e => setForm(f => ({ ...f, console: e.target.value }))}>
                 <option value="">— Sélectionne —</option>
                 {CONSOLES.map(c => <option key={c} value={c}>{c}</option>)}
               </select>
             </div>
-            <div className="form-group">
+            <div className="form-group-premium">
               <span>Genre</span>
-              <select className="form-control" value={form.genre} onChange={e => setForm(f => ({ ...f, genre: e.target.value }))}>
+              <select className="input-premium" value={form.genre} onChange={e => setForm(f => ({ ...f, genre: e.target.value }))}>
                 {GENRE_OPTIONS.map(g => <option key={g} value={g}>{g}</option>)}
               </select>
             </div>
           </div>
-          <div className="form-grid">
-            <div className="form-group">
+          <div className="form-grid-premium">
+            <div className="form-group-premium">
               <span>Date de sortie</span>
-              <input className="form-control" type="date" min="1970-01-01" max="2030-12-31" value={form.annee} onChange={e => setForm(f => ({ ...f, annee: e.target.value }))} />
+              <input className="input-premium" type="date" min="1970-01-01" max="2030-12-31" value={form.annee} onChange={e => setForm(f => ({ ...f, annee: e.target.value }))} />
             </div>
-            <div className="form-group">
+            <div className="form-group-premium">
               <span>Statut</span>
-              <select className="form-control" value={form.statut} onChange={e => setForm(f => ({ ...f, statut: e.target.value }))}>
+              <select className="input-premium" value={form.statut} onChange={e => setForm(f => ({ ...f, statut: e.target.value }))}>
                 <option value="possede">Possédé</option>
                 <option value="fini">Fini</option>
                 <option value="en_cours">En cours</option>
               </select>
             </div>
           </div>
-          <div className="form-group">
-            <span>Note ({'★'.repeat(form.note)}{'☆'.repeat(5 - form.note)})</span>
-            <div style={{ display: 'flex', gap: 6 }}>
+          <div className="form-group-premium">
+            <span>Note</span>
+            <div className="stars-rating-bar">
               {[1, 2, 3, 4, 5].map(s => (
-                <button key={s} type="button" onClick={() => setForm(f => ({ ...f, note: s }))}
-                  style={{ background: 'none', border: 'none', fontSize: 22, cursor: 'pointer', color: s <= form.note ? 'var(--accent2)' : 'var(--text3)' }}>
+                <button key={s} type="button" onClick={() => { setForm(f => ({ ...f, note: s })); playSound('click'); }}
+                  className={`star-btn ${s <= form.note ? 'active' : ''}`}>
                   ★
                 </button>
               ))}
             </div>
           </div>
-          <div className="form-group">
+          <div className="form-group-premium">
             <span>URL Couverture</span>
-            <input className="form-control" value={form.couverture} onChange={e => setForm(f => ({ ...f, couverture: e.target.value }))} />
+            <input className="input-premium" value={form.couverture} onChange={e => setForm(f => ({ ...f, couverture: e.target.value }))} />
             {form.couverture && <img src={form.couverture} alt="" className="form-cover-preview" onError={e => e.target.style.display = 'none'} />}
           </div>
-          <div className="form-group">
+          <div className="form-group-premium">
             <span>Description</span>
-            <textarea className="form-control" rows={3} value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} style={{ resize: 'vertical' }} placeholder="Description du jeu (auto-remplie via RAWG/Wikipedia)" />
+            <textarea className="input-premium" rows={3} value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} style={{ resize: 'vertical' }} placeholder="Description du jeu (auto-remplie)" />
           </div>
-          <div className="form-grid">
-            <div className="form-group">
+          <div className="form-grid-premium">
+            <div className="form-group-premium">
               <span>Valeur / Prix d'achat (€)</span>
-              <input className="form-control" type="number" min="0" step="0.01" value={form.prix} onChange={e => setForm(f => ({ ...f, prix: e.target.value }))} placeholder="0.00" />
+              <input className="input-premium" type="number" min="0" step="0.01" value={form.prix} onChange={e => setForm(f => ({ ...f, prix: e.target.value }))} placeholder="0.00" />
             </div>
-            <div className="form-group">
+            <div className="form-group-premium">
               <span>Notes personnelles</span>
-              <textarea className="form-control" rows={3} value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} style={{ resize: 'vertical' }} placeholder="Tes notes personnelles..." />
+              <textarea className="input-premium" rows={3} value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} style={{ resize: 'vertical' }} placeholder="Notes personnelles..." />
             </div>
           </div>
-          <button className="btn btn-primary btn-full" type="submit">{editingId ? 'Modifier' : 'Ajouter'} le jeu</button>
+          <button className="btn-premium btn-premium-primary btn-full" style={{ padding: '0.9rem' }} type="submit">{editingId ? 'Modifier' : 'Ajouter'} le jeu</button>
         </form>
       </Modal>
 
-      {/* Detail Modal */}
-      <Modal open={detailOpen} onClose={() => setDetailOpen(false)} title={detailGame?.titre || 'Détails'}>
+      {/* Detail Modal style Steam */}
+      <Modal open={detailOpen} onClose={() => setDetailOpen(false)} title={detailGame?.titre || 'Détails'} sizeLg>
         {detailGame && <DetailView game={detailGame} games={games} setGames={setGames} toast={toast} apiKey={apiKey}
           onEdit={() => { setDetailOpen(false); openForm(detailGame); }}
           onDelete={() => deleteGame(detailGame.id)}
@@ -699,55 +916,59 @@ export default function App() {
       </Modal>
 
       {/* API Key Modal */}
-      <Modal open={apiOpen} onClose={() => setApiOpen(false)} title="Clés API">
-        <p style={{ color: 'var(--text2)', fontSize: 'var(--font-sm)', marginBottom: '1rem' }}>
-          Clé RAWG : gratuit sur <a href="https://rawg.io/apidocs" target="_blank" style={{ color: 'var(--primary-light)' }}>rawg.io</a>.
-          Clés eBay : gratuit sur <a href="https://developer.ebay.com/" target="_blank" style={{ color: 'var(--primary-light)' }}>developer.ebay.com</a> (app Production).
+      <Modal open={apiOpen} onClose={() => setApiOpen(false)} title="Configurations API">
+        <p style={{ color: 'var(--text-muted)', fontSize: '0.8rem', marginBottom: '1.25rem' }}>
+          Clé RAWG : disponible gratuitement sur <a href="https://rawg.io/apidocs" target="_blank" style={{ color: 'var(--accent-cyan)' }}>rawg.io</a>.<br/>
+          Identifiants eBay : disponible sur <a href="https://developer.ebay.com/" target="_blank" style={{ color: 'var(--accent-cyan)' }}>developer.ebay.com</a> (Production client keys).
         </p>
-        <div className="form-group">
+        <div className="form-group-premium">
           <span>Clé API RAWG</span>
-          <input className="form-control" value={apiKey} onChange={e => setApiKey(e.target.value)} placeholder="Colle ta clé RAWG" style={{ fontFamily: 'monospace' }} />
+          <input className="input-premium" value={apiKey} onChange={e => setApiKey(e.target.value)} placeholder="Colle ta clé RAWG" style={{ fontFamily: 'monospace' }} />
         </div>
-        <div className="form-group">
+        <div className="form-group-premium">
           <span>eBay Client ID</span>
-          <input className="form-control" value={ebayCid} onChange={e => { setEbayCid(e.target.value); localStorage.setItem('ebay_cid', e.target.value); }} placeholder="Colle ton eBay Client ID" style={{ fontFamily: 'monospace' }} />
+          <input className="input-premium" value={ebayCid} onChange={e => { setEbayCid(e.target.value); localStorage.setItem('ebay_cid', e.target.value); }} placeholder="Colle ton eBay Client ID" style={{ fontFamily: 'monospace' }} />
         </div>
-        <div className="form-group">
+        <div className="form-group-premium">
           <span>eBay Client Secret</span>
-          <input className="form-control" type="password" value={ebayCs} onChange={e => { setEbayCs(e.target.value); localStorage.setItem('ebay_cs', e.target.value); }} placeholder="Colle ton eBay Client Secret" style={{ fontFamily: 'monospace' }} />
+          <input className="input-premium" type="password" value={ebayCs} onChange={e => { setEbayCs(e.target.value); localStorage.setItem('ebay_cs', e.target.value); }} placeholder="Colle ton eBay Client Secret" style={{ fontFamily: 'monospace' }} />
         </div>
-        <button className="btn btn-primary btn-full" onClick={() => { setApiOpen(false); toast('Clés enregistrées', 'success'); }}>Enregistrer</button>
+        <button className="btn-premium btn-premium-primary btn-full" onClick={() => { setApiOpen(false); toast('Configuration enregistrée', 'success'); playSound('success'); }}>Enregistrer</button>
       </Modal>
 
       {/* Platform Picker */}
-      <Modal open={platformPicker.open} onClose={() => setPlatformPicker({ open: false, platforms: [], data: null })} title="Choisis la console">
-        <p style={{ color: 'var(--text2)', fontSize: 'var(--font-sm)', marginBottom: '1rem' }}>
-          "{platformPicker.data?.name}" est disponible sur plusieurs consoles :
+      <Modal open={platformPicker.open} onClose={() => setPlatformPicker({ open: false, platforms: [], data: null })} title="Choisis la console d'accueil">
+        <p style={{ color: 'var(--text-muted)', fontSize: '0.8rem', marginBottom: '1.25rem' }}>
+          "{platformPicker.data?.name}" est référencé sur plusieurs consoles :
         </p>
-        <div className="platform-grid">
-          {platformPicker.platforms.map(p => (
-            <button key={p} className="platform-btn" onClick={() => {
-              fillFormFromRawg(platformPicker.data, p, platformPicker.wiki);
-              setPlatformPicker({ open: false, platforms: [], data: null, wiki: null });
-            }}>
-              {p}
-            </button>
-          ))}
+        <div className="modal-platform-grid">
+          {platformPicker.platforms.map(p => {
+            const familyClass = getConsoleThemeClass(p);
+            return (
+              <button key={p} className={`modal-platform-btn ${familyClass}`} style={{ '--console-color': FAMILY_COLORS[getConsoleFamily(p)] }} onClick={() => {
+                fillFormFromRawg(platformPicker.data, p, platformPicker.wiki);
+                setPlatformPicker({ open: false, platforms: [], data: null, wiki: null });
+              }}>
+                {p}
+              </button>
+            );
+          })}
         </div>
       </Modal>
 
-      {/* Lightbox */}
-      {lightboxSrc && <div className="lightbox open" onClick={() => setLightboxSrc(null)}>
-        <button className="close-btn" style={{ position: 'absolute', top: 20, right: 20, width: 40, height: 40, background: 'rgba(0,0,0,0.3)', borderRadius: '50%' }}
-          onClick={() => setLightboxSrc(null)}><X size={20} /></button>
-        <img src={lightboxSrc} alt="" onClick={e => e.stopPropagation()} />
-      </div>}
+      {/* Lightbox Premium */}
+      {lightboxSrc && (
+        <div className="lightbox-premium" onClick={() => setLightboxSrc(null)}>
+          <button className="lightbox-close" onClick={() => setLightboxSrc(null)}><X size={20} /></button>
+          <img src={lightboxSrc} alt="" onClick={e => e.stopPropagation()} />
+        </div>
+      )}
 
-      {/* Toasts */}
-      <div className="toast-container">
-        {toasts.map(t => <div key={t.id} className={`toast ${t.type}`}>{t.msg}</div>)}
+      {/* Toasts list */}
+      <div className="toasts-container-premium">
+        {toasts.map(t => <div key={t.id} className={`toast-premium ${t.type}`}>{t.msg}</div>)}
       </div>
-    </>
+    </div>
   );
 }
 
@@ -772,6 +993,7 @@ function DetailView({ game, games, setGames, toast, apiKey, onEdit, onDelete, on
   }, [game.id, game.rawgId, game.screenshots?.length, apiKey, game.titre, game.console, fetchWikiScreenshots, setGames]);
 
   async function fetchEbayPrice() {
+    playSound('click');
     setEbayLoading(true);
     setEbayError('');
     setEbayPrice(null);
@@ -784,67 +1006,174 @@ function DetailView({ game, games, setGames, toast, apiKey, onEdit, onDelete, on
       const d = await r.json();
       if (d.error) { setEbayError(d.error); return; }
       setEbayPrice(d);
+      playSound('success');
     } catch { setEbayError('Erreur de connexion'); }
     setEbayLoading(false);
   }
 
-  const coverHtml = game.couverture
-    ? <img className="detail-cover" src={game.couverture} alt="" onError={e => e.target.style.display = 'none'} />
-    : <div className="detail-cover fallback-cover" />;
+  // Calculate market tracker average pin position
+  const marketGaugePercent = useMemo(() => {
+    if (!ebayPrice || ebayPrice.max === ebayPrice.min) return 50;
+    const range = ebayPrice.max - ebayPrice.min;
+    return Math.max(0, Math.min(100, ((ebayPrice.avg - ebayPrice.min) / range) * 100));
+  }, [ebayPrice]);
 
-  return <>
-    {coverHtml}
-    {hasScreenshots && <div>
-      <div className="screenshot-label"><Maximize2 size={14} style={{ marginRight: 6 }} />Captures d'écran</div>
-      <div className="screenshot-gallery">
-        {screenshots.map((url, i) => <img key={i} src={url} alt="" loading="lazy" onClick={() => onLightbox(url)} />)}
+  return (
+    <>
+      {/* Blurred background banner and core box artwork */}
+      <div className="game-detail-banner-box">
+        {game.couverture ? (
+          <img className="game-detail-banner-blur" src={game.couverture} alt="" />
+        ) : (
+          <div className="game-detail-banner-blur" style={{ background: 'linear-gradient(45deg, #0f0c20, var(--primary))' }} />
+        )}
+        
+        <div className="game-detail-banner-content">
+          {game.couverture ? (
+            <img className="detail-cover-artwork" src={game.couverture} alt="" onError={e => e.target.style.display = 'none'} />
+          ) : (
+            <div className="detail-cover-artwork" style={{ background: 'var(--surface)', display: 'grid', placeItems: 'center', color: 'var(--text-muted)' }}>
+              <Gamepad2 size={32} />
+            </div>
+          )}
+          <div className="detail-banner-text-box">
+            <h2 className="detail-main-title">{game.titre}</h2>
+            <div className="detail-publisher-line">
+              {game.developpeur && <span>Studio : {game.developpeur}</span>}
+              {game.developpeur && game.editeur && <span> · </span>}
+              {game.editeur && <span>Éditeur : {game.editeur}</span>}
+            </div>
+          </div>
+        </div>
       </div>
-    </div>}
-    <div className="detail-info">
-      <h2>{game.titre}</h2>
-      {game.developpeur && <div className="detail-meta">Développeur : {game.developpeur}</div>}
-      {game.editeur && <div className="detail-meta">Éditeur : {game.editeur}</div>}
-      <div className="detail-grid">
-        <div className="detail-item"><div className="lbl">Console</div><div className="val">{game.console || '—'}</div></div>
-        <div className="detail-item"><div className="lbl">Genre</div><div className="val">{game.genre || '—'}</div></div>
-        <div className="detail-item"><div className="lbl">Sortie</div><div className="val">{game.annee ? (game.annee.match(/^\d{4}-\d{2}-\d{2}$/) ? new Date(game.annee + 'T00:00:00').toLocaleDateString('fr-FR') : game.annee) : '—'}</div></div>
-        <div className="detail-item"><div className="lbl">Statut</div><div className="val">{STATUTS[game.statut] || game.statut}</div></div>
-        <div className="detail-item"><div className="lbl">Ma note</div><div className="val">{'★'.repeat(game.note || 0)}{'☆'.repeat(5 - (game.note || 0))}</div></div>
-        {game.prix ? <div className="detail-item"><div className="lbl">Valeur</div><div className="val">{parseFloat(game.prix).toFixed(2).replace('.', ',')} €</div></div> : null}
-        <div className="detail-item"><div className="lbl">Ajouté</div><div className="val">{new Date(game.dateAjout).toLocaleDateString('fr-FR')}</div></div>
+
+      <div className="modal-body-premium">
+        {/* Double-column layout: stats/tables at left, eBay tracking on right */}
+        <div className="detail-layout-grid">
+          <div>
+            <div className="detail-meta-table">
+              <div className="detail-meta-row">
+                <span className="lbl">Console</span>
+                <span className="val" style={{ color: FAMILY_COLORS[getConsoleFamily(game.console)] }}>{game.console || '—'}</span>
+              </div>
+              <div className="detail-meta-row">
+                <span className="lbl">Genre de jeu</span>
+                <span className="val">{game.genre || '—'}</span>
+              </div>
+              <div className="detail-meta-row">
+                <span className="lbl">Date de sortie</span>
+                <span className="val">{game.annee ? (game.annee.match(/^\d{4}-\d{2}-\d{2}$/) ? new Date(game.annee + 'T00:00:00').toLocaleDateString('fr-FR') : game.annee) : '—'}</span>
+              </div>
+              <div className="detail-meta-row">
+                <span className="lbl">Statut collection</span>
+                <span className="val" style={{ color: game.statut === 'fini' ? 'var(--accent-green)' : game.statut === 'en_cours' ? 'var(--accent-gold)' : 'var(--primary-light)' }}>
+                  {STATUTS[game.statut] || game.statut}
+                </span>
+              </div>
+              <div className="detail-meta-row">
+                <span className="lbl">Ma note</span>
+                <span className="val" style={{ color: 'var(--accent-gold)' }}>{'★'.repeat(game.note || 0)}{'☆'.repeat(5 - (game.note || 0))}</span>
+              </div>
+              <div className="detail-meta-row">
+                <span className="lbl">Valeur enregistrée</span>
+                <span className="val" style={{ color: 'var(--accent-cyan)' }}>{game.prix ? `${parseFloat(game.prix).toFixed(2).replace('.', ',')} €` : 'Non estimée'}</span>
+              </div>
+              <div className="detail-meta-row">
+                <span className="lbl">Date d'intégration</span>
+                <span className="val">{new Date(game.dateAjout).toLocaleDateString('fr-FR')}</span>
+              </div>
+            </div>
+
+            {game.description && (
+              <div className="detail-desc-card">
+                <div className="detail-desc-card-title">Description</div>
+                <p>{game.description}</p>
+              </div>
+            )}
+
+            {game.notes && (
+              <div className="detail-desc-card" style={{ borderLeft: '3px solid var(--accent-gold)' }}>
+                <div className="detail-desc-card-title" style={{ color: 'var(--accent-gold)' }}>Notes personnelles</div>
+                <p>{game.notes}</p>
+              </div>
+            )}
+          </div>
+
+          <div>
+            {/* eBay Live Market Tracker */}
+            <div className="market-tracker-box">
+              <span className="market-title"><DollarSign size={14} /> eBay FR Tracker</span>
+              
+              {ebayLoading ? (
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', margin: '2rem 0' }}>
+                  <span className="btn-spinner" style={{ width: 22, height: 22, color: 'var(--accent-cyan)' }} />
+                  <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.5rem' }}>Analyse des cotes...</span>
+                </div>
+              ) : ebayError ? (
+                <div style={{ margin: '1rem 0', color: 'var(--danger)', fontSize: '0.78rem', textAlign: 'center' }}>
+                  {ebayError}
+                </div>
+              ) : ebayPrice ? (
+                <div style={{ animation: 'fadeIn 0.3s ease both' }}>
+                  <h4 className="market-price-avg">{ebayPrice.avg.toFixed(2).replace('.', ',')} €</h4>
+                  <p className="market-price-count">Cote moyenne calculée sur {ebayPrice.count} annonces</p>
+                  
+                  {/* Visual price gauge */}
+                  <div className="market-gauge-wrapper">
+                    <div className="market-gauge-track">
+                      <div className="market-gauge-fill" style={{ left: '0%', right: `${100 - marketGaugePercent}%` }}></div>
+                      <div className="market-gauge-pin" style={{ left: `${marketGaugePercent}%` }}></div>
+                    </div>
+                    <div className="market-gauge-labels">
+                      <span>Min: {ebayPrice.min.toFixed(0)} €</span>
+                      <span>Max: {ebayPrice.max.toFixed(0)} €</span>
+                    </div>
+                  </div>
+
+                  <button className="btn-premium btn-premium-primary btn-full" style={{ padding: '0.65rem 0', background: 'var(--accent-cyan)', borderColor: 'var(--accent-cyan)', color: '#000' }} onClick={() => {
+                    setGames(g => g.map(x => x.id === game.id ? { ...x, prix: String(ebayPrice.avg) } : x));
+                    toast('Prix appliqué à la collection', 'success');
+                    playSound('success');
+                    setEbayPrice(null);
+                  }}>Appliquer ce prix</button>
+                </div>
+              ) : (
+                <div style={{ textAlign: 'center', margin: '1.5rem 0' }}>
+                  <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '1rem' }}>Vérifie la valeur de ce jeu sur le marché d'occasion eBay France.</p>
+                  <button className="btn-premium btn-full" onClick={fetchEbayPrice}>Rechercher la cote</button>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Gallery section */}
+        {hasScreenshots && (
+          <div>
+            <div className="detail-gallery-title"><Maximize2 size={12} style={{ marginRight: 6 }} />Captures d'écran</div>
+            <div className="detail-gallery-row">
+              {screenshots.map((url, i) => <img key={i} className="detail-gallery-img" src={url} alt="" loading="lazy" onClick={() => onLightbox(url)} />)}
+            </div>
+          </div>
+        )}
       </div>
-      {game.description ? <div className="detail-desc"><div className="lbl">Description</div><p>{game.description}</p></div> : null}
-      {game.notes ? <div className="detail-desc" style={{ marginTop: 8 }}><div className="lbl">Notes perso</div><p>{game.notes}</p></div> : null}
-      <div className="detail-ebay">
-        <button className="btn btn-sm" onClick={fetchEbayPrice} disabled={ebayLoading}>{ebayLoading ? <span className="btn-spinner" /> : <DollarSign size={14} />} Prix eBay
-        </button>
-        {ebayError && <p className="ebay-error">{ebayError}</p>}
-        {ebayPrice && <div className="ebay-results">
-          <span className="ebay-avg">{ebayPrice.avg.toFixed(2).replace('.', ',')} €</span>
-          <span className="ebay-range">min {ebayPrice.min.toFixed(2).replace('.', ',')} € · max {ebayPrice.max.toFixed(2).replace('.', ',')} € · {ebayPrice.count} annonces</span>
-          <button className="btn btn-sm btn-primary" onClick={() => {
-            setGames(g => g.map(x => x.id === game.id ? { ...x, prix: String(ebayPrice.avg) } : x));
-            toast('Prix enregistré', 'success');
-            setEbayPrice(null);
-          }}>Appliquer ce prix</button>
-        </div>}
+
+      <div className="detail-footer-premium">
+        <button className="btn-premium" onClick={onEdit}><Search size={14} /> Modifier</button>
+        <button className="btn-premium" style={{ color: 'var(--danger)', borderColor: 'rgba(255,71,87,0.2)', background: 'rgba(255,71,87,0.03)' }} onClick={onDelete}><Trash2 size={14} /> Supprimer</button>
       </div>
-    </div>
-    <div className="detail-footer">
-      <button className="btn btn-secondary" onClick={onEdit}><Search size={14} /> Modifier</button>
-      <button className="btn btn-secondary" style={{ color: 'var(--danger)' }} onClick={onDelete}><Trash2 size={14} /> Supprimer</button>
-    </div>
-  </>;
+    </>
+  );
 }
 
-function Modal({ open, onClose, title, children }) {
+function Modal({ open, onClose, title, children, sizeLg = false }) {
   if (!open) return null;
   return (
     <div className="modal-overlay open" onMouseDown={e => e.target === e.currentTarget && onClose()}>
-      <section className="modal-content" role="dialog" aria-modal="true" aria-label={title}>
-        <div className="modal-header">
+      <section className={`modal-content-wrapper ${sizeLg ? 'size-lg' : ''}`} role="dialog" aria-modal="true" aria-label={title}>
+        <div className="modal-header-premium">
           <h2>{title}</h2>
-          <button className="close-btn" onClick={onClose}><X size={18} /></button>
+          <button className="modal-close-btn" onClick={onClose}><X size={18} /></button>
         </div>
         {children}
       </section>
@@ -891,27 +1220,38 @@ function AuthScreen({ onLogin }) {
   }
 
   return (
-    <div className="auth-screen">
-      <div className="auth-card">
-        <div className="auth-icon"><Shield size={32} /></div>
-        <h1>InsertCoin</h1>
-        <p className="auth-sub">Gère ta collection retrogaming</p>
+    <div className="auth-page">
+      <div className="auth-neon-grid" />
+      <div className="auth-cabinet-box">
+        <div className="auth-logo-badge"><Gamepad2 size={32} style={{ color: '#fff' }} /></div>
+        <h1>INSERTCOIN</h1>
+        <p className="subtitle">Console de Collection</p>
+        
         <form onSubmit={handleSubmit}>
-          <div className="form-group">
+          <div className="form-group-premium">
             <span>Utilisateur</span>
-            <input className="form-control" value={username} onChange={e => setUsername(e.target.value)} placeholder="Pseudo" autoFocus />
+            <input className="input-premium" value={username} onChange={e => setUsername(e.target.value)} placeholder="Pseudo collectionneur" autoFocus />
           </div>
-          <div className="form-group" style={{ position: 'relative' }}>
+          <div className="form-group-premium">
             <span>Mot de passe</span>
-            <input className="form-control" type={showPw ? 'text' : 'password'} autoComplete={mode === 'login' ? 'current-password' : 'new-password'} value={password} onChange={e => setPassword(e.target.value)} placeholder="••••••" />
-            <button type="button" className="pw-toggle" onClick={() => setShowPw(!showPw)}>{showPw ? <EyeOff size={16} /> : <Eye size={16} />}</button>
+            <div className="password-input-container">
+              <input className="input-premium" type={showPw ? 'text' : 'password'} autoComplete={mode === 'login' ? 'current-password' : 'new-password'} value={password} onChange={e => setPassword(e.target.value)} placeholder="••••••" />
+              <button type="button" className="password-toggle-btn" onClick={() => setShowPw(!showPw)}>
+                {showPw ? <EyeOff size={16} /> : <Eye size={16} />}
+              </button>
+            </div>
           </div>
-          {error && <p className="form-error">{error}</p>}
-          <button className="btn btn-primary btn-full" type="submit" disabled={loading}>{loading ? <span className="btn-spinner" /> : (mode === 'login' ? 'Connexion' : 'Créer mon compte')}</button>
+          {error && <p className="form-error" style={{ marginBottom: '1rem' }}>{error}</p>}
+          <button className="btn-premium btn-premium-primary btn-full" style={{ padding: '0.85rem' }} type="submit" disabled={loading}>
+            {loading ? <span className="btn-spinner" /> : (mode === 'login' ? 'CONNEXION' : 'CREER MON COMPTE')}
+          </button>
         </form>
-        <p className="auth-switch">
-          {mode === 'login' ? <>Pas encore de compte ? <button className="link-btn" onClick={() => { setMode('register'); setError(''); }}>Créer un compte</button></>
-            : <>Déjà un compte ? <button className="link-btn" onClick={() => { setMode('login'); setError(''); }}>Se connecter</button></>}
+        <p className="auth-bottom-switch">
+          {mode === 'login' ? (
+            <>Pas encore enregistré ? <button className="auth-link" onClick={() => { setMode('register'); setError(''); }}>Rejoins la guilde</button></>
+          ) : (
+            <>Déjà enregistré ? <button className="auth-link" onClick={() => { setMode('login'); setError(''); }}>Connecte-toi</button></>
+          )}
         </p>
       </div>
     </div>
