@@ -1512,3 +1512,60 @@ select.input-premium {
     display: none;
   }
 }
+
+/* RAWG Search Section Premium Styling */
+.rawg-row {
+  display: flex;
+  gap: 0.75rem;
+  margin-bottom: 1.25rem;
+  align-items: center;
+}
+.rawg-row .input-premium {
+  flex: 2;
+}
+.rawg-row select.input-premium {
+  flex: 1.2;
+  min-width: 140px;
+}
+.rawg-results {
+  background: var(--bg-sidebar);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  margin-bottom: 1.5rem;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  box-shadow: var(--shadow-md);
+}
+.rawg-result {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.75rem 1rem;
+  text-align: left;
+  border-bottom: 1px solid var(--border);
+  transition: var(--transition);
+}
+.rawg-result:last-child {
+  border-bottom: none;
+}
+.rawg-result:hover {
+  background: var(--surface-hover);
+}
+.rawg-result img {
+  width: 48px;
+  height: 36px;
+  object-fit: cover;
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+}
+.rawg-result span {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: #fff;
+}
+.rawg-result span span {
+  font-weight: 500;
+  margin-left: 0.25rem;
+}

@@ -103,6 +103,21 @@ const GENRE_MAP = {
   pinball: 'Autre', 'text-based': 'Aventure', 'interactive fiction': 'Aventure'
 };
 
+const RAWG_PLATFORMS = {
+  'PlayStation 5': 187, 'PlayStation 4': 18, 'PlayStation 3': 16, 'PlayStation 2': 15, 'PlayStation': 27,
+  'PSP': 17, 'PS Vita': 19, 'Xbox Series X|S': 186, 'Xbox One': 1, 'Xbox 360': 14, 'Xbox': 80,
+  'Nintendo Switch': 7, 'Nintendo Wii U': 10, 'Nintendo Wii': 11, 'Nintendo GameCube': 105,
+  'Nintendo 64': 83, 'Super Nintendo': 79, 'Nintendo (NES)': 49, 'Nintendo 3DS': 8, 'Nintendo DS': 9,
+  'Game Boy Advance': 24, 'Game Boy Color': 43, 'Game Boy': 26, 'Virtual Boy': 34,
+  'WonderSwan': 57, 'WonderSwan Color': 58,
+  'Sega Dreamcast': 106, 'Sega Saturn': 107, 'Sega Genesis / Mega Drive': 167, 'Sega Master System': 29,
+  'Sega Mega CD': 119, 'Sega 32X': 117, 'Sega Game Gear': 74, 'Sega Nomad': 74,
+  'Neo Geo AES': 12, 'Neo Geo CD': 12, 'Neo Geo MVS': 12, 'Neo Geo Pocket Color': 116,
+  'TurboGrafx-16 / PC Engine': 86, 'PC Engine CD': 86, 'PC-FX': 86,
+  'PC': 4, 'Steam Deck': 4, 'Atari 2600': 23, 'Atari 5200': 31, 'Atari 7800': 28, 'Atari Lynx': 46, 'Atari Jaguar': 112, 'Atari ST': 112,
+  'Commodore 64': 166, 'Commodore Amiga': 166, 'MSX': 113, 'MSX2': 113, 'Philips CD-i': 111, '3DO': 111, 'ColecoVision': 122, 'Intellivision': 124
+};
+
 /* 8-bit Synthesizer via Web Audio API */
 const playSound = (type) => {
   try {
@@ -224,6 +239,7 @@ export default function App() {
   const [rawgResults, setRawgResults] = useState([]);
   const [rawgLoading, setRawgLoading] = useState(false);
   const [rawgError, setRawgError] = useState('');
+  const [rawgSearchConsole, setRawgSearchConsole] = useState('all');
   const [toasts, setToasts] = useState([]);
   const [lightboxSrc, setLightboxSrc] = useState(null);
   const [platformPicker, setPlatformPicker] = useState({ open: false, platforms: [], data: null, wiki: null });
@@ -319,7 +335,15 @@ export default function App() {
     if (!rawgQuery.trim()) return;
     setRawgLoading(true); setRawgError(''); setRawgResults([]);
     try {
-      const r = await fetch(`/api/rawg/games?key=${apiKey}&search=${encodeURIComponent(rawgQuery)}&language=fr&page_size=6`);
+      const platformId = rawgSearchConsole !== 'all' ? RAWG_PLATFORMS[rawgSearchConsole] : null;
+      let url = `/api/rawg/games?key=${apiKey}&search=${encodeURIComponent(rawgQuery)}&language=fr&page_size=6`;
+      if (platformId) {
+        url += `&platforms=${platformId}`;
+      } else if (rawgSearchConsole !== 'all') {
+        // Fallback: append console name to search query if no RAWG platform ID exists
+        url = `/api/rawg/games?key=${apiKey}&search=${encodeURIComponent(rawgQuery + ' ' + rawgSearchConsole)}&language=fr&page_size=6`;
+      }
+      const r = await fetch(url);
       if (!r.ok) throw new Error('Erreur API');
       const d = await r.json();
       setRawgResults(d.results || []);
@@ -336,7 +360,11 @@ export default function App() {
       const wiki = await fetchWikipedia(g.name, rawgMatches[0] || '');
       const merged = [...rawgMatches];
       if (wiki?.platforms) { for (const p of wiki.platforms) { if (!merged.includes(p)) merged.push(p); } }
-      if (merged.length <= 1) {
+      
+      // If user selected a specific console in the search bar, and it is valid for this game, prioritize it and skip picker!
+      if (rawgSearchConsole !== 'all' && merged.includes(rawgSearchConsole)) {
+        fillFormFromRawg(g, rawgSearchConsole, wiki);
+      } else if (merged.length <= 1) {
         fillFormFromRawg(g, merged[0] || '', wiki);
       } else {
         setPlatformPicker({ open: true, platforms: merged, data: g, wiki });
@@ -482,6 +510,7 @@ export default function App() {
   function openForm(game) {
     playSound('click');
     setRawgQuery(''); setRawgResults([]); setRawgError('');
+    setRawgSearchConsole(game?.console || 'all');
     setEditingId(game?.id || '');
     const defaults = { titre: '', console: '', genre: 'Action', annee: '', couverture: '', note: 0, statut: 'possede', notes: '', description: '', developpeur: '', editeur: '', screenshots: [], rawgId: null, prix: '' };
     setForm(game ? { ...defaults, ...game, notes: game.notes && game.notes !== game.description ? game.notes : '' } : { ...defaults });
@@ -820,6 +849,10 @@ export default function App() {
         <div className="rawg-row">
           <input className="input-premium" value={rawgQuery} onChange={e => setRawgQuery(e.target.value)}
             onKeyDown={e => e.key === 'Enter' && searchRAWG()} placeholder="Rechercher sur RAWG..." />
+          <select className="input-premium" value={rawgSearchConsole} onChange={e => setRawgSearchConsole(e.target.value)}>
+            <option value="all">Toutes consoles</option>
+            {CONSOLES.map(c => <option key={c} value={c}>{c}</option>)}
+          </select>
           <button className="btn-premium btn-premium-primary" onClick={searchRAWG}><Search size={16} /></button>
         </div>
         {rawgLoading && <p style={{ color: 'var(--text-muted)', fontSize: '0.8rem', margin: '0.5rem 0' }}>Recherche...</p>}
