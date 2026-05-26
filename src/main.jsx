@@ -216,6 +216,33 @@ function handleCardMouseLeave(e) {
   card.style.setProperty('--mouse-y', '50%');
 }
 
+function cleanGameQuery(q) {
+  if (!q) return '';
+  let cleaned = q;
+  // 1. Remove text inside parentheses (e.g. "Tiebreak (ace edition)" -> "Tiebreak")
+  cleaned = cleaned.replace(/\s*\([^)]*\)/g, ' ');
+  // 2. Remove text inside brackets
+  cleaned = cleaned.replace(/\s*\[[^\]]*\]/g, ' ');
+  // 3. Remove common edition suffixes (case insensitive)
+  cleaned = cleaned.replace(/\b(ace|deluxe|gold|collector|standard|ultimate|definitive|remastered|remake|goty|game of the year|complete|special|limited)\s+edition\b/gi, ' ');
+  cleaned = cleaned.replace(/\b(remastered|remake|port|hd)\b/gi, ' ');
+  // 4. Remove special characters
+  cleaned = cleaned.replace(/[:\-!?._,]/g, ' ');
+  // 5. Existing app normalizations (nba2k -> nba 2k, etc.)
+  cleaned = cleaned
+    .replace(/nba\s*2k/gi, 'nba 2k')
+    .replace(/wwe\s*2k/gi, 'wwe 2k')
+    .replace(/nfl\s*2k/gi, 'nfl 2k')
+    .replace(/f1\s*(\d+)/gi, 'f1 $1')
+    .replace(/([a-zA-Z]+)(\d+)/g, '$1 $2')
+    .replace(/(\d+)([a-zA-Z]+)/g, (match, p1, p2) => {
+      if (p1 === '2' && p2.toLowerCase() === 'k') return match;
+      return `${p1} ${p2}`;
+    });
+  // 6. Collapse spaces and trim
+  return cleaned.replace(/\s+/g, ' ').trim();
+}
+
 export default function App() {
   const [user, setUser] = useState(() => localStorage.getItem(AUTH_USER_KEY) || '');
   const apiKeyPref = `${API_KEY}${user ? '_' + user : ''}`;
@@ -336,7 +363,19 @@ export default function App() {
       const searchRes = await fetch(`https://fr.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(q + ' jeu vidéo')}&format=json&origin=*&srlimit=6`);
       if (!searchRes.ok) return [];
       const sd = await searchRes.json();
-      const pages = sd.query?.search || [];
+      let pages = sd.query?.search || [];
+      
+      if (!pages.length) {
+        const cleaned = cleanGameQuery(q);
+        if (cleaned && cleaned.toLowerCase() !== q.toLowerCase()) {
+          const searchResFallback = await fetch(`https://fr.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(cleaned + ' jeu vidéo')}&format=json&origin=*&srlimit=6`);
+          if (searchResFallback.ok) {
+            const sdFallback = await searchResFallback.json();
+            pages = sdFallback.query?.search || [];
+          }
+        }
+      }
+      
       if (!pages.length) return [];
       
       const pageids = pages.map(p => p.pageid).filter(Boolean);
@@ -437,89 +476,71 @@ export default function App() {
     
     try {
       if (shouldSearchWiki) {
-        const results = await searchWikipediaDirect(rawgQuery);
+        let results = await searchWikipediaDirect(rawgQuery);
         if (results.length === 0) {
-          const normalizedQuery = rawgQuery
-            .replace(/nba\s*2k/gi, 'nba 2k')
-            .replace(/wwe\s*2k/gi, 'wwe 2k')
-            .replace(/nfl\s*2k/gi, 'nfl 2k')
-            .replace(/f1\s*(\d+)/gi, 'f1 $1')
-            .replace(/([a-zA-Z]+)(\d+)/g, '$1 $2')
-            .replace(/(\d+)([a-zA-Z]+)/g, (match, p1, p2) => {
-              if (p1 === '2' && p2.toLowerCase() === 'k') return match;
-              return `${p1} ${p2}`;
-            })
-            .replace(/\s+/g, ' ')
-            .trim();
-            
-          if (normalizedQuery.toLowerCase() !== rawgQuery.toLowerCase()) {
-            const fallbackResults = await searchWikipediaDirect(normalizedQuery);
-            setRawgResults(fallbackResults);
-          } else {
-            setRawgResults([]);
+          const cleaned = cleanGameQuery(rawgQuery);
+          if (cleaned.toLowerCase() !== rawgQuery.toLowerCase()) {
+            results = await searchWikipediaDirect(cleaned);
           }
-        } else {
-          setRawgResults(results);
         }
+        setRawgResults(results);
       } else {
         if (!apiKey.trim()) { setRawgError('Configure ta clé API d\'abord.'); setRawgLoading(false); return; }
         const platformId = rawgSearchConsole !== 'all' ? RAWG_PLATFORMS[rawgSearchConsole] : null;
-        let url = `/api/rawg/games?key=${apiKey}&search=${encodeURIComponent(rawgQuery)}&language=fr&page_size=6`;
-        if (platformId) {
-          url += `&platforms=${platformId}`;
-        } else if (rawgSearchConsole !== 'all') {
-          url = `/api/rawg/games?key=${apiKey}&search=${encodeURIComponent(rawgQuery + ' ' + rawgSearchConsole)}&language=fr&page_size=6`;
-        }
-        const r = await fetch(url);
-        if (!r.ok) throw new Error('Erreur API');
-        let d = await r.json();
+        const cleanedQuery = cleanGameQuery(rawgQuery);
         
-        if (!d.results || d.results.length === 0) {
-          const normalizedQuery = rawgQuery
-            .replace(/nba\s*2k/gi, 'nba 2k')
-            .replace(/wwe\s*2k/gi, 'wwe 2k')
-            .replace(/nfl\s*2k/gi, 'nfl 2k')
-            .replace(/f1\s*(\d+)/gi, 'f1 $1')
-            .replace(/([a-zA-Z]+)(\d+)/g, '$1 $2')
-            .replace(/(\d+)([a-zA-Z]+)/g, (match, p1, p2) => {
-              if (p1 === '2' && p2.toLowerCase() === 'k') return match;
-              return `${p1} ${p2}`;
-            })
-            .replace(/\s+/g, ' ')
-            .trim();
-
-          if (normalizedQuery.toLowerCase() !== rawgQuery.toLowerCase()) {
-            let fallbackUrl = `/api/rawg/games?key=${apiKey}&search=${encodeURIComponent(normalizedQuery)}&language=fr&page_size=6`;
-            if (platformId) {
-              fallbackUrl += `&platforms=${platformId}`;
-            } else if (rawgSearchConsole !== 'all') {
-              fallbackUrl = `/api/rawg/games?key=${apiKey}&search=${encodeURIComponent(normalizedQuery + ' ' + rawgSearchConsole)}&language=fr&page_size=6`;
-            }
-            const fallbackR = await fetch(fallbackUrl);
-            if (fallbackR.ok) {
-              const fallbackD = await fallbackR.json();
-              if (fallbackD.results && fallbackD.results.length > 0) {
-                d = fallbackD;
-              }
-            }
+        const fetchRawgList = async (q, pId) => {
+          if (!q.trim()) return null;
+          let url = `/api/rawg/games?key=${apiKey}&search=${encodeURIComponent(q)}&page_size=6`;
+          if (pId) {
+            url += `&platforms=${pId}`;
+          } else if (rawgSearchConsole !== 'all') {
+            url = `/api/rawg/games?key=${apiKey}&search=${encodeURIComponent(q + ' ' + rawgSearchConsole)}&page_size=6`;
           }
+          const res = await fetch(url);
+          if (!res.ok) throw new Error('Erreur API RAWG');
+          return await res.json();
+        };
+
+        const isEmpty = (data) => !data?.results || data.results.length === 0;
+
+        let d = null;
+
+        // Tier 1: Requête brute + Plateforme (sans language=fr)
+        d = await fetchRawgList(rawgQuery, platformId);
+
+        // Tier 2: Requête nettoyée + Plateforme
+        if (isEmpty(d) && cleanedQuery.toLowerCase() !== rawgQuery.toLowerCase()) {
+          d = await fetchRawgList(cleanedQuery, platformId);
         }
-        
-        if ((!d.results || d.results.length === 0) && searchSource === 'auto') {
-          const wikiResults = await searchWikipediaDirect(rawgQuery);
+
+        // Tier 3: Requête brute sans filtre de plateforme
+        if (isEmpty(d) && platformId) {
+          d = await fetchRawgList(rawgQuery, null);
+        }
+
+        // Tier 4: Requête nettoyée sans filtre de plateforme
+        if (isEmpty(d) && platformId && cleanedQuery.toLowerCase() !== rawgQuery.toLowerCase()) {
+          d = await fetchRawgList(cleanedQuery, null);
+        }
+
+        // Tier 5: Repli automatique sur Wikipedia (en mode auto)
+        if (isEmpty(d) && searchSource === 'auto') {
+          const wikiResults = await searchWikipediaDirect(cleanedQuery);
           if (wikiResults.length > 0) {
             setRawgResults(wikiResults);
             setRawgLoading(false);
             return;
           }
         }
-        
-        setRawgResults(d.results || []);
+
+        setRawgResults(d?.results || []);
       }
     } catch (e) {
       if (searchSource === 'auto') {
         try {
-          const wikiResults = await searchWikipediaDirect(rawgQuery);
+          const cleaned = cleanGameQuery(rawgQuery);
+          const wikiResults = await searchWikipediaDirect(cleaned);
           setRawgResults(wikiResults);
         } catch {
           setRawgError(e.message);
