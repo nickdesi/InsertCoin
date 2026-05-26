@@ -104,4 +104,21 @@ app.get('*', (req, res) => {
   res.sendFile('/app/dist/index.html');
 });
 
-app.listen(PORT, () => console.log('Server running on port ' + PORT));
+const server = app.listen(PORT, () => console.log('Server running on port ' + PORT));
+
+// Graceful and instant shutdown on SIGTERM / SIGINT
+process.on('SIGTERM', () => {
+  console.log('SIGTERM signal received: closing HTTP server');
+  server.close(() => {
+    console.log('HTTP server closed');
+    process.exit(0);
+  });
+});
+
+process.on('SIGINT', () => {
+  console.log('SIGINT signal received: closing HTTP server');
+  server.close(() => {
+    console.log('HTTP server closed');
+    process.exit(0);
+  });
+});
