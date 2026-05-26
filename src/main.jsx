@@ -358,9 +358,10 @@ export default function App() {
     return 'Autre';
   }
 
-  async function searchWikipediaDirect(q) {
+  async function searchWikipediaDirect(q, lang = 'fr') {
     try {
-      const searchRes = await fetch(`https://fr.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(q + ' jeu vidéo')}&format=json&origin=*&srlimit=6`);
+      const suffix = lang === 'fr' ? ' jeu vidéo' : ' video game';
+      const searchRes = await fetch(`https://${lang}.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(q + suffix)}&format=json&origin=*&srlimit=6`);
       if (!searchRes.ok) return [];
       const sd = await searchRes.json();
       let pages = sd.query?.search || [];
@@ -368,7 +369,7 @@ export default function App() {
       if (!pages.length) {
         const cleaned = cleanGameQuery(q);
         if (cleaned && cleaned.toLowerCase() !== q.toLowerCase()) {
-          const searchResFallback = await fetch(`https://fr.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(cleaned + ' jeu vidéo')}&format=json&origin=*&srlimit=6`);
+          const searchResFallback = await fetch(`https://${lang}.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(cleaned + suffix)}&format=json&origin=*&srlimit=6`);
           if (searchResFallback.ok) {
             const sdFallback = await searchResFallback.json();
             pages = sdFallback.query?.search || [];
@@ -381,7 +382,7 @@ export default function App() {
       const pageids = pages.map(p => p.pageid).filter(Boolean);
       if (!pageids.length) return [];
       
-      const detailsRes = await fetch(`https://fr.wikipedia.org/w/api.php?action=query&prop=pageimages|pageprops&pithumbsize=400&pageids=${pageids.join('|')}&format=json&origin=*`);
+      const detailsRes = await fetch(`https://${lang}.wikipedia.org/w/api.php?action=query&prop=pageimages|pageprops&pithumbsize=400&pageids=${pageids.join('|')}&format=json&origin=*`);
       if (!detailsRes.ok) return [];
       const cd = await detailsRes.json();
       const pageMap = cd.query?.pages || {};
@@ -392,25 +393,26 @@ export default function App() {
         if (!pg) continue;
         
         results.push({
-          id: `wiki_${pg.pageid}`,
+          id: `wiki_${lang}_${pg.pageid}`,
           name: page.title,
           background_image: pg.thumbnail?.source || '',
           released: '',
           isWiki: true,
-          wikiPage: page.title
+          wikiPage: page.title,
+          wikiLang: lang
         });
       }
       return results;
     } catch (e) {
-      console.error('Wikipedia search error', e);
+      console.error(`Wikipedia search error for lang ${lang}`, e);
       return [];
     }
   }
 
-  async function fetchWikipediaDetails(pageTitle) {
+  async function fetchWikipediaDetails(pageTitle, lang = 'fr') {
     const months = ['janvier','février','mars','avril','mai','juin','juillet','août','septembre','octobre','novembre','décembre'];
     try {
-      const c = await fetch(`https://fr.wikipedia.org/w/api.php?action=query&prop=extracts|pageimages|pageprops&explaintext&exchars=600&pithumbsize=400&titles=${encodeURIComponent(pageTitle)}&format=json&origin=*`);
+      const c = await fetch(`https://${lang}.wikipedia.org/w/api.php?action=query&prop=extracts|pageimages|pageprops&explaintext&exchars=600&pithumbsize=400&titles=${encodeURIComponent(pageTitle)}&format=json&origin=*`);
       const cd = await c.json();
       const pg = Object.values(cd.query.pages)[0];
       if (!pg) return null;
@@ -476,11 +478,17 @@ export default function App() {
     
     try {
       if (shouldSearchWiki) {
-        let results = await searchWikipediaDirect(rawgQuery);
+        let results = await searchWikipediaDirect(rawgQuery, 'fr');
+        if (results.length === 0) {
+          results = await searchWikipediaDirect(rawgQuery, 'en');
+        }
         if (results.length === 0) {
           const cleaned = cleanGameQuery(rawgQuery);
           if (cleaned.toLowerCase() !== rawgQuery.toLowerCase()) {
-            results = await searchWikipediaDirect(cleaned);
+            results = await searchWikipediaDirect(cleaned, 'fr');
+            if (results.length === 0) {
+              results = await searchWikipediaDirect(cleaned, 'en');
+            }
           }
         }
         setRawgResults(results);
@@ -526,7 +534,10 @@ export default function App() {
 
         // Tier 5: Repli automatique sur Wikipedia (en mode auto)
         if (isEmpty(d) && searchSource === 'auto') {
-          const wikiResults = await searchWikipediaDirect(cleanedQuery);
+          let wikiResults = await searchWikipediaDirect(cleanedQuery, 'fr');
+          if (wikiResults.length === 0) {
+            wikiResults = await searchWikipediaDirect(cleanedQuery, 'en');
+          }
           if (wikiResults.length > 0) {
             setRawgResults(wikiResults);
             setRawgLoading(false);
@@ -540,7 +551,10 @@ export default function App() {
       if (searchSource === 'auto') {
         try {
           const cleaned = cleanGameQuery(rawgQuery);
-          const wikiResults = await searchWikipediaDirect(cleaned);
+          let wikiResults = await searchWikipediaDirect(cleaned, 'fr');
+          if (wikiResults.length === 0) {
+            wikiResults = await searchWikipediaDirect(cleaned, 'en');
+          }
           setRawgResults(wikiResults);
         } catch {
           setRawgError(e.message);
@@ -555,7 +569,7 @@ export default function App() {
   async function selectWikiResult(r) {
     setRawgLoading(true);
     try {
-      const w = await fetchWikipediaDetails(r.wikiPage);
+      const w = await fetchWikipediaDetails(r.wikiPage, r.wikiLang);
       if (!w) { toast('Impossible de charger les détails', 'error'); return; }
       
       const merged = w.platforms || [];
@@ -646,69 +660,73 @@ export default function App() {
     const consoleKeywords = CONSOLES.map(c => c.toLowerCase().split(/\s+/)).flat();
     const months = ['janvier','février','mars','avril','mai','juin','juillet','août','septembre','octobre','novembre','décembre'];
     const searchQueries = [titre, `${titre} ${console}`, `${titre} jeu vidéo`];
-    for (const query of searchQueries) {
-      try {
-        const s = await fetch(`https://fr.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(query)}&format=json&origin=*&srlimit=5`);
-        const sd = await s.json();
-        const pages = sd.query?.search || [];
-        for (const page of pages) {
-          const pageTitle = page.title.toLowerCase();
-          const consoleOnly = consoleKeywords.some(k => k.length > 2 && pageTitle.includes(k)) && !pageTitle.includes(titre.toLowerCase());
-          if (consoleOnly) continue;
-          const c = await fetch(`https://fr.wikipedia.org/w/api.php?action=query&prop=extracts|pageimages|pageprops&explaintext&exchars=600&pithumbsize=400&titles=${encodeURIComponent(page.title)}&format=json&origin=*`);
-          const cd = await c.json();
-          const pg = Object.values(cd.query.pages)[0];
-          if (!pg) continue;
-          const desc = pg.extract || '';
-          if (desc.length <= 30) continue;
-          let releaseDate = null;
-          let platforms = null;
-          let developpeur = '';
-          let editeur = '';
-          let coverUrl = pg.thumbnail?.source || null;
-          const wikidataId = pg.pageprops?.wikibase_item;
-          if (wikidataId) {
-            try {
-              const wd = await fetch(`https://www.wikidata.org/wiki/Special:EntityData/${wikidataId}.json`);
-              const wdd = await wd.json();
-              const claims = wdd.entities[wikidataId]?.claims;
-              if (claims) {
-                const platIds = (claims.P400 || []).map(c => c.mainsnak?.datavalue?.value?.id).filter(Boolean);
-                if (platIds.length) {
-                  const labels = await fetch(`https://www.wikidata.org/w/api.php?action=wbgetentities&ids=${platIds.join('|')}&props=labels&languages=fr&format=json&origin=*`);
-                  const lbl = await labels.json();
-                  platforms = platIds.map(id => lbl.entities[id]?.labels?.fr?.value || null).filter(Boolean);
-                }
-                for (const claim of (claims.P577 || [])) {
-                  const countries = claim.qualifiers?.P291?.map(q => q.datavalue?.value?.id) || [];
-                  const time = claim.mainsnak?.datavalue?.value?.time;
-                  if (time && (countries.includes('Q142') || !releaseDate)) {
-                    releaseDate = time.replace(/^\+/, '').replace(/T.*$/, '');
-                    if (countries.includes('Q142')) break;
+    for (const lang of ['fr', 'en']) {
+      const suffix = lang === 'fr' ? ' jeu vidéo' : ' video game';
+      const searchQueriesLang = [titre, `${titre} ${console}`, `${titre}${suffix}`];
+      for (const query of searchQueriesLang) {
+        try {
+          const s = await fetch(`https://${lang}.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(query)}&format=json&origin=*&srlimit=5`);
+          const sd = await s.json();
+          const pages = sd.query?.search || [];
+          for (const page of pages) {
+            const pageTitle = page.title.toLowerCase();
+            const consoleOnly = consoleKeywords.some(k => k.length > 2 && pageTitle.includes(k)) && !pageTitle.includes(titre.toLowerCase());
+            if (consoleOnly) continue;
+            const c = await fetch(`https://${lang}.wikipedia.org/w/api.php?action=query&prop=extracts|pageimages|pageprops&explaintext&exchars=600&pithumbsize=400&titles=${encodeURIComponent(page.title)}&format=json&origin=*`);
+            const cd = await c.json();
+            const pg = Object.values(cd.query.pages)[0];
+            if (!pg) continue;
+            const desc = pg.extract || '';
+            if (desc.length <= 30) continue;
+            let releaseDate = null;
+            let platforms = null;
+            let developpeur = '';
+            let editeur = '';
+            let coverUrl = pg.thumbnail?.source || null;
+            const wikidataId = pg.pageprops?.wikibase_item;
+            if (wikidataId) {
+              try {
+                const wd = await fetch(`https://www.wikidata.org/wiki/Special:EntityData/${wikidataId}.json`);
+                const wdd = await wd.json();
+                const claims = wdd.entities[wikidataId]?.claims;
+                if (claims) {
+                  const platIds = (claims.P400 || []).map(c => c.mainsnak?.datavalue?.value?.id).filter(Boolean);
+                  if (platIds.length) {
+                    const labels = await fetch(`https://www.wikidata.org/w/api.php?action=wbgetentities&ids=${platIds.join('|')}&props=labels&languages=fr&format=json&origin=*`);
+                    const lbl = await labels.json();
+                    platforms = platIds.map(id => lbl.entities[id]?.labels?.fr?.value || null).filter(Boolean);
+                  }
+                  for (const claim of (claims.P577 || [])) {
+                    const countries = claim.qualifiers?.P291?.map(q => q.datavalue?.value?.id) || [];
+                    const time = claim.mainsnak?.datavalue?.value?.time;
+                    if (time && (countries.includes('Q142') || !releaseDate)) {
+                      releaseDate = time.replace(/^\+/, '').replace(/T.*$/, '');
+                      if (countries.includes('Q142')) break;
+                    }
+                  }
+                  const devId = claims.P178?.[0]?.mainsnak?.datavalue?.value?.id;
+                  if (devId) {
+                    const dl = await fetch(`https://www.wikidata.org/w/api.php?action=wbgetentities&ids=${devId}&props=labels&languages=fr&format=json&origin=*`);
+                    const dd = await dl.json();
+                    developpeur = dd.entities[devId]?.labels?.fr?.value || '';
+                  }
+                  const pubId = claims.P123?.[0]?.mainsnak?.datavalue?.value?.id;
+                  if (pubId) {
+                    const pl = await fetch(`https://www.wikidata.org/w/api.php?action=wbgetentities&ids=${pubId}&props=labels&languages=fr&format=json&origin=*`);
+                    const pd = await pl.json();
+                    editeur = pd.entities[pubId]?.labels?.fr?.value || '';
                   }
                 }
-                const devId = claims.P178?.[0]?.mainsnak?.datavalue?.value?.id;
-                if (devId) {
-                  const dl = await fetch(`https://www.wikidata.org/w/api.php?action=wbgetentities&ids=${devId}&props=labels&languages=fr&format=json&origin=*`);
-                  const dd = await dl.json();
-                  developpeur = dd.entities[devId]?.labels?.fr?.value || '';
-                }
-                const pubId = claims.P123?.[0]?.mainsnak?.datavalue?.value?.id;
-                if (pubId) {
-                  const pl = await fetch(`https://www.wikidata.org/w/api.php?action=wbgetentities&ids=${pubId}&props=labels&languages=fr&format=json&origin=*`);
-                  const pd = await pl.json();
-                  editeur = pd.entities[pubId]?.labels?.fr?.value || '';
-                }
-              }
-            } catch {}
+              } catch {}
+            }
+            if (!releaseDate) {
+              const dm = desc.match(/sortie?\s+(?:le\s+)?(\d{1,2})\s+(janvier|février|mars|avril|mai|juin|juillet|août|septembre|octobre|novembre|décembre)\s+(\d{4})/i);
+              if (dm) { const mi = months.indexOf(dm[2].toLowerCase()) + 1; releaseDate = `${dm[3]}-${String(mi).padStart(2,'0')}-${String(dm[1]).padStart(2,'0')}`; }
+            }
+            return { description: desc, coverUrl, releaseDate, platforms, developpeur, editeur };
           }
-          if (!releaseDate) {
-            const dm = desc.match(/sortie?\s+(?:le\s+)?(\d{1,2})\s+(janvier|février|mars|avril|mai|juin|juillet|août|septembre|octobre|novembre|décembre)\s+(\d{4})/i);
-            if (dm) { const mi = months.indexOf(dm[2].toLowerCase()) + 1; releaseDate = `${dm[3]}-${String(mi).padStart(2,'0')}-${String(dm[1]).padStart(2,'0')}`; }
-          }
-          return { description: desc, coverUrl, releaseDate, platforms, developpeur, editeur };
-        }
-      } catch { continue; }
+        } catch { continue; }
+      }
     }
     return null;
   }
@@ -1120,7 +1138,7 @@ export default function App() {
                 {r.released ? (
                   <span style={{ color: 'var(--text-dark)' }}>({r.released.split('-')[0]})</span>
                 ) : null}
-                {r.isWiki && <span style={{ fontSize: '0.65rem', color: 'var(--accent-cyan)', background: 'rgba(0,240,255,0.1)', border: '1px solid rgba(0,240,255,0.2)', padding: '2px 6px', borderRadius: '4px', marginLeft: '8px', fontWeight: '800' }}>WIKI</span>}
+                {r.isWiki && <span style={{ fontSize: '0.65rem', color: 'var(--accent-cyan)', background: 'rgba(0,240,255,0.1)', border: '1px solid rgba(0,240,255,0.2)', padding: '2px 6px', borderRadius: '4px', marginLeft: '8px', fontWeight: '800' }}>WIKI {r.wikiLang?.toUpperCase()}</span>}
               </span>
             </button>
           ))}
