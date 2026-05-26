@@ -86,14 +86,39 @@ app.post('/api/ebay/price', async (req, res) => {
 
     if (!prices.length) return res.json({ error: 'Aucune annonce trouvée sur eBay FR' });
 
-    const vals = prices.map(p => p.price);
+    const rawVals = prices.map(p => p.price);
+    
+    // Helper to calculate the median
+    const sortedVals = [...rawVals].sort((a, b) => a - b);
+    const mid = Math.floor(sortedVals.length / 2);
+    const median = sortedVals.length % 2 !== 0 ? sortedVals[mid] : (sortedVals[mid - 1] + sortedVals[mid]) / 2;
+    
+    // Phase 1: Filter out items that are extreme anomalies relative to the median (e.g. > 3.5x or < 0.25x the median)
+    // This helps remove completely unrelated listings (accessories at 2€ or crazy speculative listings at 500€)
+    let filteredPrices = prices.filter(p => p.price >= median * 0.25 && p.price <= median * 3.5);
+    
+    // Phase 2: IQR (Interquartile Range) filter if we have enough items (at least 4)
+    if (filteredPrices.length >= 4) {
+      const fVals = filteredPrices.map(p => p.price).sort((a, b) => a - b);
+      const q1 = fVals[Math.floor(fVals.length * 0.25)];
+      const q3 = fVals[Math.floor(fVals.length * 0.75)];
+      const iqr = q3 - q1;
+      const lower = q1 - 1.5 * iqr;
+      const upper = q3 + 1.5 * iqr;
+      filteredPrices = filteredPrices.filter(p => p.price >= lower && p.price <= upper);
+    }
+    
+    // If our filtering removed everything (which shouldn't happen), fallback to raw prices
+    const finalPrices = filteredPrices.length > 0 ? filteredPrices : prices;
+    const finalVals = finalPrices.map(p => p.price);
+
     res.json({
-      min: Math.min(...vals),
-      max: Math.max(...vals),
-      avg: +(vals.reduce((a, b) => a + b, 0) / vals.length).toFixed(2),
-      count: vals.length,
-      currency: prices[0].currency,
-      items: prices
+      min: Math.min(...finalVals),
+      max: Math.max(...finalVals),
+      avg: +(finalVals.reduce((a, b) => a + b, 0) / finalVals.length).toFixed(2),
+      count: finalVals.length,
+      currency: finalPrices[0].currency,
+      items: finalPrices
     });
   } catch (e) {
     res.status(500).json({ error: e.message });
