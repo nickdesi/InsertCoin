@@ -243,6 +243,225 @@ function cleanGameQuery(q) {
   return cleaned.replace(/\s+/g, ' ').trim();
 }
 
+function CompletionDonutChart({ byStatut, total }) {
+  const possede = byStatut.possede || 0;
+  const enCours = byStatut.en_cours || 0;
+  const fini = byStatut.fini || 0;
+
+  const p1 = total ? (possede / total) : 0;
+  const p2 = total ? (enCours / total) : 0;
+  const p3 = total ? (fini / total) : 0;
+
+  const c1 = 251.32;
+  const offset1 = c1 - p1 * c1;
+
+  const c2 = 188.49;
+  const offset2 = c2 - p2 * c2;
+
+  const c3 = 125.66;
+  const offset3 = c3 - p3 * c3;
+
+  return (
+    <svg width="100%" height="100%" viewBox="0 0 100 100" className="concentric-rings-svg">
+      <circle cx="50" cy="50" r="40" className="ring-bg" strokeWidth="4" />
+      <circle cx="50" cy="50" r="40" className="ring-fill ring-possede" strokeWidth="5"
+        strokeDasharray={c1} strokeDashoffset={offset1} strokeLinecap="round" transform="rotate(-90 50 50)" />
+
+      <circle cx="50" cy="50" r="30" className="ring-bg" strokeWidth="4" />
+      <circle cx="50" cy="50" r="30" className="ring-fill ring-en-cours" strokeWidth="5"
+        strokeDasharray={c2} strokeDashoffset={offset2} strokeLinecap="round" transform="rotate(-90 50 50)" />
+
+      <circle cx="50" cy="50" r="20" className="ring-bg" strokeWidth="4" />
+      <circle cx="50" cy="50" r="20" className="ring-fill ring-fini" strokeWidth="5"
+        strokeDasharray={c3} strokeDashoffset={offset3} strokeLinecap="round" transform="rotate(-90 50 50)" />
+        
+      <text x="50" y="55" className="concentric-center-text" textAnchor="middle">
+        {total ? Math.round((fini / total) * 100) : 0}%
+      </text>
+    </svg>
+  );
+}
+
+function FamilyBarChart({ byFamily, total }) {
+  const families = Object.keys(CONSOLE_FAMILIES);
+  const maxCount = Math.max(1, ...Object.values(byFamily));
+
+  return (
+    <div className="family-bar-chart">
+      {families.map(f => {
+        const count = byFamily[f] || 0;
+        const percentOfMax = (count / maxCount) * 100;
+        const color = FAMILY_COLORS[f] || 'var(--primary)';
+        return (
+          <div key={f} className="family-bar-item" title={`${f} : ${count} jeu(x)`}>
+            <div className="family-bar-track">
+              <div className="family-bar-fill" style={{ 
+                height: `${percentOfMax}%`, 
+                backgroundColor: color,
+                boxShadow: `0 0 12px ${color}80`
+              }}>
+                {count > 0 && <span className="family-bar-val">{count}</span>}
+              </div>
+            </div>
+            <span className="family-bar-label" style={{ color: color }}>{f}</span>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function DecadeHistogram({ byDecade }) {
+  const decades = [1970, 1980, 1990, 2000, 2010, 2020];
+  const maxCount = Math.max(1, ...decades.map(d => byDecade[d] || 0));
+
+  return (
+    <div className="decade-histogram">
+      {decades.map(d => {
+        const count = byDecade[d] || 0;
+        const percentOfMax = (count / maxCount) * 100;
+        return (
+          <div key={d} className="decade-bar-item" title={`${d}s : ${count} jeu(x)`}>
+            <div className="decade-bar-track">
+              <div className="decade-bar-fill" style={{ height: `${percentOfMax}%` }}>
+                {count > 0 && <span className="decade-bar-val">{count}</span>}
+              </div>
+            </div>
+            <span className="decade-bar-label">{d}s</span>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function TopGenresList({ byGenre, total }) {
+  const sorted = Object.entries(byGenre)
+    .filter(([_, count]) => count > 0)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 5);
+
+  if (!sorted.length) {
+    return <p className="stats-empty-msg">Aucun genre enregistré</p>;
+  }
+
+  const maxCount = sorted[0][1];
+
+  return (
+    <div className="genres-list-chart">
+      {sorted.map(([genre, count]) => {
+        const percentOfTotal = total ? Math.round((count / total) * 100) : 0;
+        const percentOfMax = (count / maxCount) * 100;
+        return (
+          <div key={genre} className="genre-row-item">
+            <div className="genre-row-meta">
+              <span className="genre-name">{genre}</span>
+              <span className="genre-count">{count} jeux ({percentOfTotal}%)</span>
+            </div>
+            <div className="genre-row-track">
+              <div className="genre-row-fill" style={{ width: `${percentOfMax}%` }} />
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function StatsView({ stats, games, totalValue, openDetail }) {
+  return (
+    <div className="stats-dashboard fade-in">
+      <div className="stats-hero-grid">
+        <div className="stats-hero-card">
+          <span className="stats-hero-val highlight">{games.length}</span>
+          <span className="stats-hero-lbl">Jeux au total</span>
+        </div>
+        <div className="stats-hero-card">
+          <span className="stats-hero-val">{totalValue > 0 ? `${Math.round(totalValue)} €` : '—'}</span>
+          <span className="stats-hero-lbl">Valeur Estimée</span>
+        </div>
+        <div className="stats-hero-card">
+          <span className="stats-hero-val" style={{ color: FAMILY_COLORS[stats.favFamily] || 'var(--text)' }}>{stats.favFamily}</span>
+          <span className="stats-hero-lbl">Gamer de Cœur</span>
+        </div>
+        <div className="stats-hero-card">
+          <span className="stats-hero-val" style={{ color: 'var(--accent-cyan)' }}>{stats.favGenre}</span>
+          <span className="stats-hero-lbl">Genre Favori</span>
+        </div>
+      </div>
+
+      <div className="stats-main-row">
+        <div className="stats-widget-card completion-card">
+          <h3 className="stats-widget-title">Statut de la Collection</h3>
+          <div className="completion-widget-content">
+            <div className="completion-svg-container">
+              <CompletionDonutChart byStatut={stats.byStatut} total={games.length} />
+            </div>
+            <div className="completion-legend">
+              <div className="legend-item">
+                <span className="legend-dot status-possede" />
+                <span className="legend-lbl">Possédé : <strong>{stats.byStatut.possede || 0}</strong> ({games.length ? Math.round(((stats.byStatut.possede || 0) / games.length) * 100) : 0}%)</span>
+              </div>
+              <div className="legend-item">
+                <span className="legend-dot status-en-cours" />
+                <span className="legend-lbl">En cours : <strong>{stats.byStatut.en_cours || 0}</strong> ({games.length ? Math.round(((stats.byStatut.en_cours || 0) / games.length) * 100) : 0}%)</span>
+              </div>
+              <div className="legend-item">
+                <span className="legend-dot status-fini" />
+                <span className="legend-lbl">Fini : <strong>{stats.byStatut.fini || 0}</strong> ({games.length ? Math.round(((stats.byStatut.fini || 0) / games.length) * 100) : 0}%)</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="stats-widget-card family-chart-card">
+          <h3 className="stats-widget-title">Distribution par Constructeur</h3>
+          <div className="family-chart-content">
+            <FamilyBarChart byFamily={stats.byFamily} total={games.length} />
+          </div>
+        </div>
+      </div>
+
+      <div className="stats-secondary-row">
+        <div className="stats-widget-card decade-card">
+          <h3 className="stats-widget-title">Époque de Prédilection</h3>
+          <div className="decade-chart-content">
+            <DecadeHistogram byDecade={stats.byDecade} />
+          </div>
+        </div>
+
+        <div className="stats-widget-card genre-card">
+          <h3 className="stats-widget-title">Genres les plus représentés</h3>
+          <div className="genre-chart-content">
+            <TopGenresList byGenre={stats.byGenre} total={games.length} />
+          </div>
+        </div>
+      </div>
+      
+      {totalValue > 0 && (
+        <div className="stats-widget-card full-width-card price-analytics-card">
+          <h3 className="stats-widget-title">Analyses Financières de la Collection</h3>
+          <div className="price-analytics-grid">
+            <div className="price-stat-item">
+              <span className="price-lbl">Valeur Moyenne par Jeu</span>
+              <span className="price-val">{stats.avgPrice} €</span>
+            </div>
+            {stats.maxPriceGame && (
+              <div className="price-stat-item highlight-item" onClick={() => openDetail(stats.maxPriceGame)}>
+                <span className="price-lbl">Pièce de Valeur Record</span>
+                <div className="record-game-details">
+                  <span className="record-price">{parseFloat(stats.maxPriceGame.prix).toFixed(2).replace('.', ',')} €</span>
+                  <span className="record-title">{stats.maxPriceGame.titre} ({stats.maxPriceGame.console})</span>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function App() {
   const [user, setUser] = useState(() => localStorage.getItem(AUTH_USER_KEY) || '');
   const apiKeyPref = `${API_KEY}${user ? '_' + user : ''}`;
@@ -876,15 +1095,87 @@ export default function App() {
   }, [games]);
 
   const stats = useMemo(() => {
-    const byFamily = {}; const byDecade = {}; let fin = 0, rated = 0, totalR = 0;
+    const byFamily = {};
+    const byDecade = {};
+    const byGenre = {};
+    const byStatut = { possede: 0, en_cours: 0, fini: 0 };
+    let fin = 0;
+    let rated = 0;
+    let totalR = 0;
+    let maxPriceGame = null;
+    let gamesWithPriceCount = 0;
+
     games.forEach(g => {
-      for (const [f, cs] of Object.entries(CONSOLE_FAMILIES)) { if (cs.includes(g.console)) { byFamily[f] = (byFamily[f] || 0) + 1; break; } }
-      if (g.annee) { const d = Math.floor(parseInt(g.annee) / 10) * 10; byDecade[d] = (byDecade[d] || 0) + 1; }
+      let foundFamily = 'Autre';
+      for (const [f, cs] of Object.entries(CONSOLE_FAMILIES)) {
+        if (cs.includes(g.console)) {
+          foundFamily = f;
+          break;
+        }
+      }
+      byFamily[foundFamily] = (byFamily[foundFamily] || 0) + 1;
+
+      if (g.annee) {
+        const d = Math.floor(parseInt(g.annee) / 10) * 10;
+        if (!isNaN(d) && d > 1950 && d < 2100) {
+          byDecade[d] = (byDecade[d] || 0) + 1;
+        }
+      }
+
+      if (g.genre) {
+        byGenre[g.genre] = (byGenre[g.genre] || 0) + 1;
+      }
+
+      if (g.statut) {
+        byStatut[g.statut] = (byStatut[g.statut] || 0) + 1;
+      }
+
       if (g.statut === 'fini') fin++;
-      if (g.note) { totalR += g.note; rated++; }
+      if (g.note) {
+        totalR += g.note;
+        rated++;
+      }
+
+      const price = parseFloat(g.prix);
+      if (!isNaN(price) && price > 0) {
+        gamesWithPriceCount++;
+        if (!maxPriceGame || price > parseFloat(maxPriceGame.prix)) {
+          maxPriceGame = g;
+        }
+      }
     });
-    return { byFamily, byDecade, fin, avg: rated ? (totalR / rated).toFixed(1) : '-' };
-  }, [games]);
+
+    let favFamily = '—';
+    let maxFamilyCount = 0;
+    for (const [f, count] of Object.entries(byFamily)) {
+      if (count > maxFamilyCount) {
+        maxFamilyCount = count;
+        favFamily = f;
+      }
+    }
+
+    let favGenre = '—';
+    let maxGenreCount = 0;
+    for (const [g, count] of Object.entries(byGenre)) {
+      if (count > maxGenreCount) {
+        maxGenreCount = count;
+        favGenre = g;
+      }
+    }
+
+    return {
+      byFamily,
+      byDecade,
+      byGenre,
+      byStatut,
+      fin,
+      avg: rated ? (totalR / rated).toFixed(1) : '-',
+      favFamily,
+      favGenre,
+      maxPriceGame,
+      avgPrice: gamesWithPriceCount ? (totalValue / gamesWithPriceCount).toFixed(2) : '-'
+    };
+  }, [games, totalValue]);
 
   if (!user) return <AuthScreen onLogin={login} />;
 
@@ -984,6 +1275,7 @@ export default function App() {
             <div className="view-selector">
               <button className={`view-select-btn ${view === 'grid' ? 'active' : ''}`} onClick={() => { setView('grid'); playSound('click'); }} title="Grille Holographique"><LayoutGrid size={16} /></button>
               <button className={`view-select-btn ${view === 'list' ? 'active' : ''}`} onClick={() => { setView('list'); playSound('click'); }} title="Tableau des Scores"><List size={16} /></button>
+              <button className={`view-select-btn ${view === 'stats' ? 'active' : ''}`} onClick={() => { setView('stats'); playSound('click'); }} title="Statistiques & Graphiques"><ChartPie size={16} /></button>
             </div>
             <button className="btn-premium btn-premium-primary" onClick={() => openForm()}><Plus size={16} /> Ajouter un jeu</button>
           </div>
@@ -1031,6 +1323,8 @@ export default function App() {
               <h2>Aucun résultat</h2>
               <p>Essaie de modifier tes filtres ou tes recherches.</p>
             </div>
+          ) : view === 'stats' ? (
+            <StatsView stats={stats} games={games} totalValue={totalValue} openDetail={openDetail} />
           ) : view === 'list' ? (
             <div className="games-list-table">
               {filteredGames.map(g => {
