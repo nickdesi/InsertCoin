@@ -240,6 +240,7 @@ export default function App() {
   const [rawgLoading, setRawgLoading] = useState(false);
   const [rawgError, setRawgError] = useState('');
   const [rawgSearchConsole, setRawgSearchConsole] = useState('all');
+  const [searchSource, setSearchSource] = useState('auto');
   const [toasts, setToasts] = useState([]);
   const [lightboxSrc, setLightboxSrc] = useState(null);
   const [platformPicker, setPlatformPicker] = useState({ open: false, platforms: [], data: null, wiki: null });
@@ -330,28 +331,234 @@ export default function App() {
     return 'Autre';
   }
 
+  async function searchWikipediaDirect(q) {
+    try {
+      const searchRes = await fetch(`https://fr.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(q + ' jeu vidéo')}&format=json&origin=*&srlimit=6`);
+      if (!searchRes.ok) return [];
+      const sd = await searchRes.json();
+      const pages = sd.query?.search || [];
+      if (!pages.length) return [];
+      
+      const pageids = pages.map(p => p.pageid).filter(Boolean);
+      if (!pageids.length) return [];
+      
+      const detailsRes = await fetch(`https://fr.wikipedia.org/w/api.php?action=query&prop=pageimages|pageprops&pithumbsize=400&pageids=${pageids.join('|')}&format=json&origin=*`);
+      if (!detailsRes.ok) return [];
+      const cd = await detailsRes.json();
+      const pageMap = cd.query?.pages || {};
+      
+      const results = [];
+      for (const page of pages) {
+        const pg = pageMap[page.pageid];
+        if (!pg) continue;
+        
+        results.push({
+          id: `wiki_${pg.pageid}`,
+          name: page.title,
+          background_image: pg.thumbnail?.source || '',
+          released: '',
+          isWiki: true,
+          wikiPage: page.title
+        });
+      }
+      return results;
+    } catch (e) {
+      console.error('Wikipedia search error', e);
+      return [];
+    }
+  }
+
+  async function fetchWikipediaDetails(pageTitle) {
+    const months = ['janvier','février','mars','avril','mai','juin','juillet','août','septembre','octobre','novembre','décembre'];
+    try {
+      const c = await fetch(`https://fr.wikipedia.org/w/api.php?action=query&prop=extracts|pageimages|pageprops&explaintext&exchars=600&pithumbsize=400&titles=${encodeURIComponent(pageTitle)}&format=json&origin=*`);
+      const cd = await c.json();
+      const pg = Object.values(cd.query.pages)[0];
+      if (!pg) return null;
+      const desc = pg.extract || '';
+      let releaseDate = null;
+      let platforms = null;
+      let developpeur = '';
+      let editeur = '';
+      let coverUrl = pg.thumbnail?.source || null;
+      const wikidataId = pg.pageprops?.wikibase_item;
+      if (wikidataId) {
+        try {
+          const wd = await fetch(`https://www.wikidata.org/wiki/Special:EntityData/${wikidataId}.json`);
+          const wdd = await wd.json();
+          const claims = wdd.entities[wikidataId]?.claims;
+          if (claims) {
+            const platIds = (claims.P400 || []).map(c => c.mainsnak?.datavalue?.value?.id).filter(Boolean);
+            if (platIds.length) {
+              const labels = await fetch(`https://www.wikidata.org/w/api.php?action=wbgetentities&ids=${platIds.join('|')}&props=labels&languages=fr&format=json&origin=*`);
+              const lbl = await labels.json();
+              platforms = platIds.map(id => lbl.entities[id]?.labels?.fr?.value || null).filter(Boolean);
+              if (platforms) {
+                platforms = platforms.map(p => PLATFORM_MAP[p.toLowerCase().trim()] || p).filter(p => CONSOLES.includes(p));
+              }
+            }
+            for (const claim of (claims.P577 || [])) {
+              const countries = claim.qualifiers?.P291?.map(q => q.datavalue?.value?.id) || [];
+              const time = claim.mainsnak?.datavalue?.value?.time;
+              if (time && (countries.includes('Q142') || !releaseDate)) {
+                releaseDate = time.replace(/^\+/, '').replace(/T.*$/, '');
+                if (countries.includes('Q142')) break;
+              }
+            }
+            const devId = claims.P178?.[0]?.mainsnak?.datavalue?.value?.id;
+            if (devId) {
+              const dl = await fetch(`https://www.wikidata.org/w/api.php?action=wbgetentities&ids=${devId}&props=labels&languages=fr&format=json&origin=*`);
+              const dd = await dl.json();
+              developpeur = dd.entities[devId]?.labels?.fr?.value || '';
+            }
+            const pubId = claims.P123?.[0]?.mainsnak?.datavalue?.value?.id;
+            if (pubId) {
+              const pl = await fetch(`https://www.wikidata.org/w/api.php?action=wbgetentities&ids=${pubId}&props=labels&languages=fr&format=json&origin=*`);
+              const pd = await pl.json();
+              editeur = pd.entities[pubId]?.labels?.fr?.value || '';
+            }
+          }
+        } catch {}
+      }
+      if (!releaseDate) {
+        const dm = desc.match(/sortie?\s+(?:le\s+)?(\d{1,2})\s+(janvier|février|mars|avril|mai|juin|juillet|août|septembre|octobre|novembre|décembre)\s+(\d{4})/i);
+        if (dm) { const mi = months.indexOf(dm[2].toLowerCase()) + 1; releaseDate = `${dm[3]}-${String(mi).padStart(2,'0')}-${String(dm[1]).padStart(2,'0')}`; }
+      }
+      return { title: pageTitle, description: desc, coverUrl, releaseDate, platforms, developpeur, editeur };
+    } catch {
+      return null;
+    }
+  }
+
   async function searchRAWG() {
-    if (!apiKey.trim()) { setRawgError('Configure ta clé API d\'abord.'); return; }
     if (!rawgQuery.trim()) return;
     setRawgLoading(true); setRawgError(''); setRawgResults([]);
+    const shouldSearchWiki = searchSource === 'wikipedia' || (searchSource === 'auto' && !apiKey.trim());
+    
     try {
-      const platformId = rawgSearchConsole !== 'all' ? RAWG_PLATFORMS[rawgSearchConsole] : null;
-      let url = `/api/rawg/games?key=${apiKey}&search=${encodeURIComponent(rawgQuery)}&language=fr&page_size=6`;
-      if (platformId) {
-        url += `&platforms=${platformId}`;
-      } else if (rawgSearchConsole !== 'all') {
-        // Fallback: append console name to search query if no RAWG platform ID exists
-        url = `/api/rawg/games?key=${apiKey}&search=${encodeURIComponent(rawgQuery + ' ' + rawgSearchConsole)}&language=fr&page_size=6`;
+      if (shouldSearchWiki) {
+        const results = await searchWikipediaDirect(rawgQuery);
+        if (results.length === 0) {
+          const normalizedQuery = rawgQuery
+            .replace(/nba\s*2k/gi, 'nba 2k')
+            .replace(/wwe\s*2k/gi, 'wwe 2k')
+            .replace(/nfl\s*2k/gi, 'nfl 2k')
+            .replace(/f1\s*(\d+)/gi, 'f1 $1')
+            .replace(/([a-zA-Z]+)(\d+)/g, '$1 $2')
+            .replace(/(\d+)([a-zA-Z]+)/g, (match, p1, p2) => {
+              if (p1 === '2' && p2.toLowerCase() === 'k') return match;
+              return `${p1} ${p2}`;
+            })
+            .replace(/\s+/g, ' ')
+            .trim();
+            
+          if (normalizedQuery.toLowerCase() !== rawgQuery.toLowerCase()) {
+            const fallbackResults = await searchWikipediaDirect(normalizedQuery);
+            setRawgResults(fallbackResults);
+          } else {
+            setRawgResults([]);
+          }
+        } else {
+          setRawgResults(results);
+        }
+      } else {
+        if (!apiKey.trim()) { setRawgError('Configure ta clé API d\'abord.'); setRawgLoading(false); return; }
+        const platformId = rawgSearchConsole !== 'all' ? RAWG_PLATFORMS[rawgSearchConsole] : null;
+        let url = `/api/rawg/games?key=${apiKey}&search=${encodeURIComponent(rawgQuery)}&language=fr&page_size=6`;
+        if (platformId) {
+          url += `&platforms=${platformId}`;
+        } else if (rawgSearchConsole !== 'all') {
+          url = `/api/rawg/games?key=${apiKey}&search=${encodeURIComponent(rawgQuery + ' ' + rawgSearchConsole)}&language=fr&page_size=6`;
+        }
+        const r = await fetch(url);
+        if (!r.ok) throw new Error('Erreur API');
+        let d = await r.json();
+        
+        if (!d.results || d.results.length === 0) {
+          const normalizedQuery = rawgQuery
+            .replace(/nba\s*2k/gi, 'nba 2k')
+            .replace(/wwe\s*2k/gi, 'wwe 2k')
+            .replace(/nfl\s*2k/gi, 'nfl 2k')
+            .replace(/f1\s*(\d+)/gi, 'f1 $1')
+            .replace(/([a-zA-Z]+)(\d+)/g, '$1 $2')
+            .replace(/(\d+)([a-zA-Z]+)/g, (match, p1, p2) => {
+              if (p1 === '2' && p2.toLowerCase() === 'k') return match;
+              return `${p1} ${p2}`;
+            })
+            .replace(/\s+/g, ' ')
+            .trim();
+
+          if (normalizedQuery.toLowerCase() !== rawgQuery.toLowerCase()) {
+            let fallbackUrl = `/api/rawg/games?key=${apiKey}&search=${encodeURIComponent(normalizedQuery)}&language=fr&page_size=6`;
+            if (platformId) {
+              fallbackUrl += `&platforms=${platformId}`;
+            } else if (rawgSearchConsole !== 'all') {
+              fallbackUrl = `/api/rawg/games?key=${apiKey}&search=${encodeURIComponent(normalizedQuery + ' ' + rawgSearchConsole)}&language=fr&page_size=6`;
+            }
+            const fallbackR = await fetch(fallbackUrl);
+            if (fallbackR.ok) {
+              const fallbackD = await fallbackR.json();
+              if (fallbackD.results && fallbackD.results.length > 0) {
+                d = fallbackD;
+              }
+            }
+          }
+        }
+        
+        if ((!d.results || d.results.length === 0) && searchSource === 'auto') {
+          const wikiResults = await searchWikipediaDirect(rawgQuery);
+          if (wikiResults.length > 0) {
+            setRawgResults(wikiResults);
+            setRawgLoading(false);
+            return;
+          }
+        }
+        
+        setRawgResults(d.results || []);
       }
-      const r = await fetch(url);
-      if (!r.ok) throw new Error('Erreur API');
-      const d = await r.json();
-      setRawgResults(d.results || []);
-    } catch (e) { setRawgError(e.message); }
+    } catch (e) {
+      if (searchSource === 'auto') {
+        try {
+          const wikiResults = await searchWikipediaDirect(rawgQuery);
+          setRawgResults(wikiResults);
+        } catch {
+          setRawgError(e.message);
+        }
+      } else {
+        setRawgError(e.message);
+      }
+    }
+    setRawgLoading(false);
+  }
+
+  async function selectWikiResult(r) {
+    setRawgLoading(true);
+    try {
+      const w = await fetchWikipediaDetails(r.wikiPage);
+      if (!w) { toast('Impossible de charger les détails', 'error'); return; }
+      
+      const merged = w.platforms || [];
+      if (rawgSearchConsole !== 'all' && merged.includes(rawgSearchConsole)) {
+        fillFormFromWiki(w, rawgSearchConsole);
+      } else if (merged.length <= 1) {
+        fillFormFromWiki(w, merged[0] || '');
+      } else {
+        setPlatformPicker({ open: true, platforms: merged, data: null, wiki: w, isWiki: true });
+      }
+    } catch (e) {
+      toast('Erreur de chargement Wikipedia', 'error');
+    }
     setRawgLoading(false);
   }
 
   async function selectResult(rawgId) {
+    if (String(rawgId).startsWith('wiki_')) {
+      const resultObj = rawgResults.find(r => r.id === rawgId);
+      if (resultObj) {
+        await selectWikiResult(resultObj);
+      }
+      return;
+    }
     try {
       const r = await fetch(`/api/rawg/games/${rawgId}?key=${apiKey}&language=fr`);
       if (!r.ok) { toast('Erreur API RAWG', 'error'); return; }
@@ -361,7 +568,6 @@ export default function App() {
       const merged = [...rawgMatches];
       if (wiki?.platforms) { for (const p of wiki.platforms) { if (!merged.includes(p)) merged.push(p); } }
       
-      // If user selected a specific console in the search bar, and it is valid for this game, prioritize it and skip picker!
       if (rawgSearchConsole !== 'all' && merged.includes(rawgSearchConsole)) {
         fillFormFromRawg(g, rawgSearchConsole, wiki);
       } else if (merged.length <= 1) {
@@ -370,6 +576,26 @@ export default function App() {
         setPlatformPicker({ open: true, platforms: merged, data: g, wiki });
       }
     } catch (e) { toast('Erreur chargement RAWG', 'error'); }
+  }
+
+  function fillFormFromWiki(w, consoleVal) {
+    let genreVal = 'Action';
+    const descLower = (w.description || '').toLowerCase();
+    for (const [kw, g] of Object.entries(GENRE_MAP)) {
+      if (descLower.includes(kw)) {
+        genreVal = g;
+        break;
+      }
+    }
+    const date = w.releaseDate || '';
+    setForm(f => ({ ...f, titre: w.title, console: consoleVal, genre: genreVal, annee: date, couverture: w.coverUrl || '', note: 0, description: w.description || '', developpeur: w.developpeur || '', editeur: w.editeur || '', rawgId: null, screenshots: [] }));
+    setRawgResults([]);
+    toast(`"${w.title}" chargé depuis Wikipedia`, 'success');
+    playSound('success');
+
+    fetchWikiScreenshots(w.title, consoleVal).then(urls => {
+      if (urls.length) { setForm(f => ({ ...f, screenshots: urls })); }
+    });
   }
 
   function fillFormFromRawg(g, consoleVal, wiki) {
@@ -793,19 +1019,15 @@ export default function App() {
                 const consoleColor = FAMILY_COLORS[family] || '#8a3ffc';
                 const themeClass = getConsoleThemeClass(g.console);
                 
-                // Formulate retro grading label
-                const gradeLabel = g.statut === 'fini' ? '9.8 / A++' : g.statut === 'en_cours' ? '8.5 / B+' : '9.0 / A';
-                
                 return (
                   <div key={g.id} className="game-card-wrapper">
                     <div className={`game-card ${themeClass}`} style={{ '--console-color': consoleColor }} onClick={() => openDetail(g)} onMouseMove={handleCardMouseMove} onMouseLeave={handleCardMouseLeave}>
                       {/* Left Cartridge Spine border indicator */}
                       <div className="card-spine-badge" />
                       
-                      {/* Grading protection sticker case */}
-                      <div className="grading-sticker">
-                        <span className="grading-sticker-top">Graded</span>
-                        <span className={`grading-sticker-grade grading-stick-${g.statut}`}>{gradeLabel}</span>
+                      {/* Elegant Hardware Status Tag */}
+                      <div className={`status-hardware-tag status-tag-${g.statut}`}>
+                        {STATUTS[g.statut] || g.statut}
                       </div>
                       
                       {/* Quick delete & edit buttons on hover */}
@@ -847,8 +1069,13 @@ export default function App() {
       {/* Form Modal */}
       <Modal open={formOpen} onClose={() => setFormOpen(false)} title={editingId ? 'Modifier le jeu' : 'Ajouter un jeu'}>
         <div className="rawg-row">
+          <select className="input-premium" style={{ flex: '0.6', minWidth: '100px' }} value={searchSource} onChange={e => setSearchSource(e.target.value)}>
+            <option value="auto">🌐 Auto</option>
+            <option value="rawg">🎮 RAWG</option>
+            <option value="wikipedia">📝 Wiki</option>
+          </select>
           <input className="input-premium" value={rawgQuery} onChange={e => setRawgQuery(e.target.value)}
-            onKeyDown={e => e.key === 'Enter' && searchRAWG()} placeholder="Rechercher sur RAWG..." />
+            onKeyDown={e => e.key === 'Enter' && searchRAWG()} placeholder={searchSource === 'wikipedia' ? "Rechercher sur Wikipedia..." : "Rechercher sur RAWG..."} />
           <select className="input-premium" value={rawgSearchConsole} onChange={e => setRawgSearchConsole(e.target.value)}>
             <option value="all">Toutes consoles</option>
             {CONSOLES.map(c => <option key={c} value={c}>{c}</option>)}
@@ -860,8 +1087,20 @@ export default function App() {
         {rawgResults.length > 0 && <div className="rawg-results">
           {rawgResults.map(r => (
             <button key={r.id} className="rawg-result" onClick={() => selectResult(r.id)}>
-              {r.background_image && <img src={r.background_image} alt="" />}
-              <span>{r.name} <span style={{ color: 'var(--text-dark)' }}>({r.released ? r.released.split('-')[0] : '?'})</span></span>
+              {r.background_image ? (
+                <img src={r.background_image} alt="" />
+              ) : (
+                <div style={{ width: '48px', height: '36px', borderRadius: 'var(--radius-sm)', background: 'var(--surface)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <Gamepad2 size={16} style={{ color: 'var(--text-muted)' }} />
+                </div>
+              )}
+              <span>
+                {r.name} 
+                {r.released ? (
+                  <span style={{ color: 'var(--text-dark)' }}>({r.released.split('-')[0]})</span>
+                ) : null}
+                {r.isWiki && <span style={{ fontSize: '0.65rem', color: 'var(--accent-cyan)', background: 'rgba(0,240,255,0.1)', border: '1px solid rgba(0,240,255,0.2)', padding: '2px 6px', borderRadius: '4px', marginLeft: '8px', fontWeight: '800' }}>WIKI</span>}
+              </span>
             </button>
           ))}
         </div>}
@@ -970,17 +1209,21 @@ export default function App() {
       </Modal>
 
       {/* Platform Picker */}
-      <Modal open={platformPicker.open} onClose={() => setPlatformPicker({ open: false, platforms: [], data: null })} title="Choisis la console d'accueil">
+      <Modal open={platformPicker.open} onClose={() => setPlatformPicker({ open: false, platforms: [], data: null, wiki: null, isWiki: false })} title="Choisis la console d'accueil">
         <p style={{ color: 'var(--text-muted)', fontSize: '0.8rem', marginBottom: '1.25rem' }}>
-          "{platformPicker.data?.name}" est référencé sur plusieurs consoles :
+          "{platformPicker.isWiki ? platformPicker.wiki?.title : platformPicker.data?.name}" est référencé sur plusieurs consoles :
         </p>
         <div className="modal-platform-grid">
           {platformPicker.platforms.map(p => {
             const familyClass = getConsoleThemeClass(p);
             return (
               <button key={p} className={`modal-platform-btn ${familyClass}`} style={{ '--console-color': FAMILY_COLORS[getConsoleFamily(p)] }} onClick={() => {
-                fillFormFromRawg(platformPicker.data, p, platformPicker.wiki);
-                setPlatformPicker({ open: false, platforms: [], data: null, wiki: null });
+                if (platformPicker.isWiki) {
+                  fillFormFromWiki(platformPicker.wiki, p);
+                } else {
+                  fillFormFromRawg(platformPicker.data, p, platformPicker.wiki);
+                }
+                setPlatformPicker({ open: false, platforms: [], data: null, wiki: null, isWiki: false });
               }}>
                 {p}
               </button>
