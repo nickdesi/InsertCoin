@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
-import { Download, DollarSign, Gamepad2, Ghost, KeyRound, Plus, Search, Trash2, X, Upload, Dice5, LayoutGrid, List, ChartPie, ChevronDown, ChevronUp, Maximize2, LogOut, User, Shield, Eye, EyeOff } from 'lucide-react';
+import { Download, DollarSign, Gamepad2, Ghost, KeyRound, Pencil, Plus, Search, Trash2, X, Upload, Dice5, LayoutGrid, List, ChartPie, ChevronDown, ChevronUp, Maximize2, LogOut, User, Shield, Eye, EyeOff } from 'lucide-react';
 import './styles.css';
 
 const AUTH_USER_KEY = 'insertcoin_user';
@@ -475,6 +475,7 @@ export default function App() {
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState({ family: 'all', console: 'all', decade: 'all' });
   const [view, setView] = useState('grid');
+  const [sortBy, setSortBy] = useState('recent');
   const [formOpen, setFormOpen] = useState(false);
   const [detailOpen, setDetailOpen] = useState(false);
   const [detailGame, setDetailGame] = useState(null);
@@ -533,14 +534,23 @@ export default function App() {
   };
 
   const filteredGames = useMemo(() => {
-    return games.filter(g => {
+    const result = games.filter(g => {
       if (filter.family !== 'all') { const fc = CONSOLE_FAMILIES[filter.family]; if (!fc || !fc.includes(g.console)) return false; }
       if (filter.console !== 'all' && g.console !== filter.console) return false;
       if (filter.decade !== 'all') { const d = g.annee ? Math.floor(parseInt(g.annee) / 10) * 10 : 0; if (d !== parseInt(filter.decade)) return false; }
       if (query.trim()) { const q = query.toLowerCase(); return [g.titre, g.console, g.genre].some(v => (v || '').toLowerCase().includes(q)); }
       return true;
     });
-  }, [games, filter, query]);
+    const sorts = {
+      recent: (a, b) => (b.dateAjout || 0) - (a.dateAjout || 0),
+      title: (a, b) => (a.titre || '').localeCompare(b.titre || '', 'fr'),
+      rating: (a, b) => (b.note || 0) - (a.note || 0),
+      year: (a, b) => (b.annee || '').localeCompare(a.annee || ''),
+      value: (a, b) => (parseFloat(b.prix) || 0) - (parseFloat(a.prix) || 0)
+    };
+    if (sorts[sortBy]) result.sort(sorts[sortBy]);
+    return result;
+  }, [games, filter, query, sortBy]);
 
   function matchConsole(platforms) {
     if (!platforms || !platforms.length) return '';
@@ -1268,10 +1278,17 @@ export default function App() {
         <section className="content-toolbar">
           <label className="toolbar-search">
             <Search size={18} />
-            <input value={query} onChange={e => { setQuery(e.target.value); playSound('click'); }} placeholder="Rechercher par titre, console, genre..." />
+            <input value={query} onChange={e => setQuery(e.target.value)} placeholder="Rechercher par titre, console, genre..." />
           </label>
           
           <div className="toolbar-actions">
+            <select className="sort-select" value={sortBy} onChange={e => setSortBy(e.target.value)}>
+              <option value="recent">Récents</option>
+              <option value="title">Titre A→Z</option>
+              <option value="rating">Note ↓</option>
+              <option value="year">Année ↓</option>
+              <option value="value">Valeur ↓</option>
+            </select>
             <div className="view-selector">
               <button className={`view-select-btn ${view === 'grid' ? 'active' : ''}`} onClick={() => { setView('grid'); playSound('click'); }} title="Grille Holographique"><LayoutGrid size={16} /></button>
               <button className={`view-select-btn ${view === 'list' ? 'active' : ''}`} onClick={() => { setView('list'); playSound('click'); }} title="Tableau des Scores"><List size={16} /></button>
@@ -1675,7 +1692,7 @@ function DetailView({ game, games, setGames, toast, apiKey, onEdit, onDelete, on
               </div>
               <div className="detail-meta-row">
                 <span className="lbl">Statut collection</span>
-                <span className="val" style={{ color: game.statut === 'fini' ? 'var(--accent-green)' : game.statut === 'en_cours' ? 'var(--accent-gold)' : 'var(--primary-light)' }}>
+                <span className="val" style={{ color: game.statut === 'fini' ? 'var(--accent-green)' : game.statut === 'en_cours' ? 'var(--primary)' : 'var(--accent-cyan)' }}>
                   {STATUTS[game.statut] || game.statut}
                 </span>
               </div>
@@ -1768,7 +1785,7 @@ function DetailView({ game, games, setGames, toast, apiKey, onEdit, onDelete, on
       </div>
 
       <div className="detail-footer-premium">
-        <button className="btn-premium" onClick={onEdit}><Search size={14} /> Modifier</button>
+        <button className="btn-premium" onClick={onEdit}><Pencil size={14} /> Modifier</button>
         <button className="btn-premium" style={{ color: 'var(--danger)', borderColor: 'rgba(255,71,87,0.2)', background: 'rgba(255,71,87,0.03)' }} onClick={onDelete}><Trash2 size={14} /> Supprimer</button>
       </div>
     </>
@@ -1776,6 +1793,12 @@ function DetailView({ game, games, setGames, toast, apiKey, onEdit, onDelete, on
 }
 
 function Modal({ open, onClose, title, children, sizeLg = false }) {
+  useEffect(() => {
+    if (!open) return;
+    const h = (e) => { if (e.key === 'Escape') onClose(); };
+    document.addEventListener('keydown', h);
+    return () => document.removeEventListener('keydown', h);
+  }, [open, onClose]);
   if (!open) return null;
   return (
     <div className="modal-overlay open" onMouseDown={e => e.target === e.currentTarget && onClose()}>
