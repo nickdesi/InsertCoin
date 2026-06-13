@@ -124,10 +124,10 @@ const playSound = (type) => {
     const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
     const osc = audioCtx.createOscillator();
     const gain = audioCtx.createGain();
-    
+
     osc.connect(gain);
     gain.connect(audioCtx.destination);
-    
+
     if (type === 'coin') {
       const now = audioCtx.currentTime;
       osc.type = 'square';
@@ -201,7 +201,7 @@ function handleCardMouseMove(e) {
   const y = e.clientY - rect.top;
   const px = (x / rect.width) - 0.5;
   const py = (y / rect.height) - 0.5;
-  
+
   card.style.setProperty('--tilt-x', `${-py * 16}deg`);
   card.style.setProperty('--tilt-y', `${px * 16}deg`);
   card.style.setProperty('--mouse-x', `${(x / rect.width) * 100}%`);
@@ -274,7 +274,7 @@ function CompletionDonutChart({ byStatut, total }) {
       <circle cx="50" cy="50" r="20" className="ring-bg" strokeWidth="4" />
       <circle cx="50" cy="50" r="20" className="ring-fill ring-fini" strokeWidth="5"
         strokeDasharray={c3} strokeDashoffset={offset3} strokeLinecap="round" transform="rotate(-90 50 50)" />
-        
+
       <text x="50" y="55" className="concentric-center-text" textAnchor="middle">
         {total ? Math.round((fini / total) * 100) : 0}%
       </text>
@@ -295,8 +295,8 @@ function FamilyBarChart({ byFamily, total }) {
         return (
           <div key={f} className="family-bar-item" title={`${f} : ${count} jeu(x)`}>
             <div className="family-bar-track">
-              <div className="family-bar-fill" style={{ 
-                height: `${percentOfMax}%`, 
+              <div className="family-bar-fill" style={{
+                height: `${percentOfMax}%`,
                 backgroundColor: color,
                 boxShadow: `0 0 12px ${color}80`
               }}>
@@ -437,7 +437,7 @@ function StatsView({ stats, games, totalValue, openDetail }) {
           </div>
         </div>
       </div>
-      
+
       {totalValue > 0 && (
         <div className="stats-widget-card full-width-card price-analytics-card">
           <h3 className="stats-widget-title">Analyses Financières de la Collection</h3>
@@ -506,7 +506,7 @@ export default function App() {
       setEbayCs(localStorage.getItem('ebay_cs') || '');
     }
   }, [user]);
-  
+
   const setApiKey = (k) => { localStorage.setItem(apiKeyPref, k.trim()); setApiKeyRaw(k.trim()); };
 
   function logout() {
@@ -594,7 +594,7 @@ export default function App() {
       if (!searchRes.ok) return [];
       const sd = await searchRes.json();
       let pages = sd.query?.search || [];
-      
+
       if (!pages.length) {
         const cleaned = cleanGameQuery(q);
         if (cleaned && cleaned.toLowerCase() !== q.toLowerCase()) {
@@ -605,22 +605,22 @@ export default function App() {
           }
         }
       }
-      
+
       if (!pages.length) return [];
-      
+
       const pageids = pages.map(p => p.pageid).filter(Boolean);
       if (!pageids.length) return [];
-      
+
       const detailsRes = await fetch(`https://${lang}.wikipedia.org/w/api.php?action=query&prop=pageimages|pageprops&pithumbsize=400&pageids=${pageids.join('|')}&format=json&origin=*`);
       if (!detailsRes.ok) return [];
       const cd = await detailsRes.json();
       const pageMap = cd.query?.pages || {};
-      
+
       const results = [];
       for (const page of pages) {
         const pg = pageMap[page.pageid];
         if (!pg) continue;
-        
+
         results.push({
           id: `wiki_${lang}_${pg.pageid}`,
           name: page.title,
@@ -704,7 +704,7 @@ export default function App() {
     if (!rawgQuery.trim()) return;
     setRawgLoading(true); setRawgError(''); setRawgResults([]);
     const shouldSearchWiki = searchSource === 'wikipedia' || (searchSource === 'auto' && !apiKey.trim());
-    
+
     try {
       if (shouldSearchWiki) {
         let results = await searchWikipediaDirect(rawgQuery, 'fr');
@@ -725,7 +725,7 @@ export default function App() {
         if (!apiKey.trim()) { setRawgError('Configure ta clé API d\'abord.'); setRawgLoading(false); return; }
         const platformId = rawgSearchConsole !== 'all' ? RAWG_PLATFORMS[rawgSearchConsole] : null;
         const cleanedQuery = cleanGameQuery(rawgQuery);
-        
+
         const fetchRawgList = async (q, pId) => {
           if (!q.trim()) return null;
           let url = `/api/rawg/games?key=${apiKey}&search=${encodeURIComponent(q)}&page_size=6`;
@@ -800,7 +800,7 @@ export default function App() {
     try {
       const w = await fetchWikipediaDetails(r.wikiPage, r.wikiLang);
       if (!w) { toast('Impossible de charger les détails', 'error'); return; }
-      
+
       const merged = w.platforms || [];
       if (rawgSearchConsole !== 'all' && merged.includes(rawgSearchConsole)) {
         fillFormFromWiki(w, rawgSearchConsole);
@@ -831,7 +831,7 @@ export default function App() {
       const wiki = await fetchWikipedia(g.name, rawgMatches[0] || '');
       const merged = [...rawgMatches];
       if (wiki?.platforms) { for (const p of wiki.platforms) { if (!merged.includes(p)) merged.push(p); } }
-      
+
       if (rawgSearchConsole !== 'all' && merged.includes(rawgSearchConsole)) {
         fillFormFromRawg(g, rawgSearchConsole, wiki);
       } else if (merged.length <= 1) {
@@ -996,7 +996,7 @@ export default function App() {
     setGames(g => editingId ? g.map(x => x.id === editingId ? game : x) : [game, ...g]);
     setFormOpen(false);
     toast(editingId ? `"${game.titre}" modifié` : `"${game.titre}" ajouté !`, 'success');
-    
+
     // Fire arcade micro-animation and synth
     handleCoinInsert();
   }
@@ -1280,7 +1280,7 @@ export default function App() {
             <Search size={18} />
             <input value={query} onChange={e => setQuery(e.target.value)} placeholder="Rechercher par titre, console, genre..." />
           </label>
-          
+
           <div className="toolbar-actions">
             <select className="sort-select" value={sortBy} onChange={e => setSortBy(e.target.value)}>
               <option value="recent">Récents</option>
@@ -1368,23 +1368,23 @@ export default function App() {
                 const family = getConsoleFamily(g.console);
                 const consoleColor = FAMILY_COLORS[family] || '#8a3ffc';
                 const themeClass = getConsoleThemeClass(g.console);
-                
+
                 return (
                   <div key={g.id} className="game-card-wrapper">
                     <div className={`game-card ${themeClass}`} style={{ '--console-color': consoleColor }} onClick={() => openDetail(g)} onMouseMove={handleCardMouseMove} onMouseLeave={handleCardMouseLeave}>
                       {/* Left Cartridge Spine border indicator */}
                       <div className="card-spine-badge" />
-                      
+
                       {/* Elegant Hardware Status Tag */}
                       <div className={`status-hardware-tag status-tag-${g.statut}`}>
                         {STATUTS[g.statut] || g.statut}
                       </div>
-                      
+
                       {/* Quick delete & edit buttons on hover */}
                       <div className="card-quick-actions">
                         <button className="card-action-btn delete" onClick={e => { e.stopPropagation(); deleteGame(g.id); }}><Trash2 size={13} /></button>
                       </div>
-                      
+
                       {/* Cover box artwork */}
                       <div className="card-cover-container">
                         {g.couverture ? (
@@ -1395,7 +1395,7 @@ export default function App() {
                           </div>
                         )}
                       </div>
-                      
+
                       {/* Bottom Info overlay */}
                       <div className="card-info-overlay">
                         <h3 className="card-title">{g.titre}</h3>
@@ -1445,7 +1445,7 @@ export default function App() {
                 </div>
               )}
               <span>
-                {r.name} 
+                {r.name}
                 {r.released ? (
                   <span style={{ color: 'var(--text-dark)' }}>({r.released.split('-')[0]})</span>
                 ) : null}
@@ -1653,7 +1653,7 @@ function DetailView({ game, games, setGames, toast, apiKey, onEdit, onDelete, on
         ) : (
           <div className="game-detail-banner-blur" style={{ background: 'linear-gradient(45deg, #0f0c20, var(--primary))' }} />
         )}
-        
+
         <div className="game-detail-banner-content">
           {game.couverture ? (
             <img className="detail-cover-artwork" src={game.couverture} alt="" onError={e => e.target.style.display = 'none'} />
@@ -1729,7 +1729,7 @@ function DetailView({ game, games, setGames, toast, apiKey, onEdit, onDelete, on
             {/* eBay Live Market Tracker */}
             <div className="market-tracker-box">
               <span className="market-title"><DollarSign size={14} /> eBay FR Tracker</span>
-              
+
               {ebayLoading ? (
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', margin: '2rem 0' }}>
                   <span className="btn-spinner" style={{ width: 22, height: 22, color: 'var(--accent-cyan)' }} />
@@ -1743,7 +1743,7 @@ function DetailView({ game, games, setGames, toast, apiKey, onEdit, onDelete, on
                 <div style={{ animation: 'fadeIn 0.3s ease both' }}>
                   <h4 className="market-price-avg">{ebayPrice.avg.toFixed(2).replace('.', ',')} €</h4>
                   <p className="market-price-count">Cote moyenne calculée sur {ebayPrice.count} annonces</p>
-                  
+
                   {/* Visual price gauge */}
                   <div className="market-gauge-wrapper">
                     <div className="market-gauge-track">
@@ -1858,7 +1858,7 @@ function AuthScreen({ onLogin }) {
         <div className="auth-logo-badge"><Gamepad2 size={32} style={{ color: '#fff' }} /></div>
         <h1>INSERTCOIN</h1>
         <p className="subtitle">Console de Collection</p>
-        
+
         <form onSubmit={handleSubmit}>
           <div className="form-group-premium">
             <span>Utilisateur</span>

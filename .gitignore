@@ -3,3 +3,10 @@ dist
 .env
 .env.local
 .DS_Store
+
+# Agent-specific directories
+.agents/
+skills/
+scratch_skills/
+/data/
+/scratch/

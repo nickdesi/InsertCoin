@@ -7,7 +7,7 @@
   --surface: rgba(39, 39, 42, 0.45);
   --surface-hover: rgba(39, 39, 42, 0.85);
   --surface-active: #27272a;
-  
+
   /* Classy Arcade/Hardware Accents */
   --primary: #f59e0b; /* Warm Retro Gold/Amber */
   --primary-light: #fbbf24;
@@ -17,12 +17,12 @@
   --accent-gold: #f59e0b;
   --accent-green: #10b981; /* Pure Mint Success */
   --danger: #ef4444;
-  
+
   /* Precision Typography Typography */
   --text: #f4f4f5; /* Warm White */
   --text-muted: #a1a1aa; /* Zinc-400 */
   --text-dark: #52525b; /* Zinc-600 */
-  
+
   /* Micro Hardware Details */
   --border: rgba(255, 255, 255, 0.08);
   --border-glow: rgba(245, 158, 11, 0.15);
@@ -55,7 +55,7 @@
 body {
   font-family: 'Outfit', sans-serif;
   background-color: var(--bg);
-  background-image: 
+  background-image:
     radial-gradient(at 0% 0%, rgba(139, 92, 246, 0.05) 0px, transparent 50%),
     radial-gradient(at 100% 100%, rgba(0, 240, 255, 0.05) 0px, transparent 50%);
   color: var(--text);
@@ -394,7 +394,7 @@ input, select, textarea {
 /* CRT Info Monitor Widget */
 .crt-widget {
   background: #121215;
-  background-image: 
+  background-image:
     linear-gradient(rgba(255, 255, 255, 0.012) 1px, transparent 1px),
     linear-gradient(90deg, rgba(255, 255, 255, 0.012) 1px, transparent 1px);
   background-size: 24px 24px;
@@ -679,13 +679,13 @@ input, select, textarea {
   flex-direction: column;
   box-shadow: var(--shadow-md);
   cursor: pointer;
-  
+
   /* 3D Hardware variables */
   --tilt-x: 0deg;
   --tilt-y: 0deg;
   --mouse-x: 50%;
   --mouse-y: 50%;
-  
+
   transform-style: preserve-3d;
   transform: perspective(1000px) rotateX(var(--tilt-x)) rotateY(var(--tilt-y)) scale(1) translateY(0);
   transition: border-color 0.3s ease, box-shadow 0.3s ease, transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
@@ -713,7 +713,7 @@ input, select, textarea {
   transform: perspective(1000px) rotateX(var(--tilt-x)) rotateY(var(--tilt-y)) scale(1.03) translateY(-6px);
   transition: border-color 0.3s ease, box-shadow 0.3s ease, transform 0.08s ease-out; /* fast tracking during hover */
   border-color: var(--console-color, var(--primary));
-  box-shadow: 
+  box-shadow:
     0 16px 28px rgba(0, 0, 0, 0.65),
     0 0 12px rgba(var(--console-color), 0.15);
   z-index: 10;
@@ -1330,7 +1330,7 @@ select.input-premium {
   align-items: center;
   justify-content: center;
   padding: 1.5rem;
-  background-image: 
+  background-image:
     radial-gradient(circle at center, rgba(245, 158, 11, 0.02) 0%, transparent 60%),
     linear-gradient(rgba(0, 0, 0, 0.2) 50%, transparent 50%);
   background-size: 100% 100%, 100% 4px;
@@ -2169,5 +2169,3 @@ select.input-premium {
   from { opacity: 0; transform: translateY(12px) scale(0.97); }
   to { opacity: 1; transform: translateY(0) scale(1); }
 }
-
-
