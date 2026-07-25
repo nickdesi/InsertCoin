@@ -21,9 +21,6 @@ permissions:
   pull-requests: write
   contents: write
 
-env:
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
-
 jobs:
   review:
     runs-on: ubuntu-latest
@@ -34,18 +31,19 @@ jobs:
 
     steps:
       - name: Checkout Repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
       - name: Setup Node.js
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@v4
         with:
-          node-version: 24
+          node-version: 20
 
       - name: Run AI Reviewer
-        if: env.GEMINI_API_KEY != ''
+        if: env.GEMINI_API_KEY != '' && (github.event_name == 'pull_request' || inputs.pr_number != '')
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITHUB_PR_NUMBER: ${{ inputs.pr_number || github.event.pull_request.number }}
         run: node .github/scripts/ai-pr-reviewer.cjs
+
