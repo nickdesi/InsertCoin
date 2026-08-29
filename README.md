@@ -4,6 +4,7 @@
 
 **A sleek, responsive retro-gaming collection manager built with React, Vite & Tailwind CSS — ready for Docker & Coolify.**
 
+[![Version](https://img.shields.io/badge/version-1.0.0-blue.svg)](https://github.com/nickdesi/InsertCoin/releases)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Security Policy](https://img.shields.io/badge/Security-Policy-blue.svg)](SECURITY.md)
 [![React](https://img.shields.io/badge/React-18-61dafb.svg?logo=react&logoColor=black)](https://react.dev/)
